@@ -188,79 +188,6 @@ export interface SamplerInstance {
 	programChange(channel: number, program: number): void;
 
 	/**
-	 * Generate output samples. This method is equivalent to
-	 * {@code render(samples, offset, frames, 1.0f, 1.0f, true, true)}.
-	 * <br><br>
-	 * For information regarding the operations of this method, see
-	 * {@link render(float[],int,int,float,float,boolean,boolean)}.
-	 * @param samples Output sample buffer.
-	 * @param offset Index in {@code samples} of the first audio frame to
-	 * output.
-	 * @param frames The number of audio frames to output.
-	 * @exception NullPointerException if {@code samples} is {@code null}.
-	 * @exception ArrayIndexOutOfBoundsException if {@code offset} is
-	 * negative, or if {@code offset + frames * 2 > samples.length}.
-	 * @exception IllegalArgumentException if {@code frames} is negative.
-	 * @see render(float[],int,int,float,float,boolean,boolean)
-	 */
-	render(/*float[]*/ samples: number[], offset: number, frames: number): void;
-
-	/**
-	 * Generate output samples. This method is equivalent to
-	 * {@code render(samples, offset, frames, amplitude, amplitude,
-	 * true, true)}.<br><br>
-	 * For information regarding the operations of this method, see
-	 * {@link render(float[],int,int,float,float,boolean,boolean)}.
-	 * @param samples Output sample buffer.
-	 * @param offset Index in {@code samples} of the first audio frame to
-	 * output.
-	 * @param frames The number of audio frames to output.
-	 * @param amplitude A multiplier that is applied to all samples
-	 * generated.
-	 * @exception NullPointerException if {@code samples} is {@code null}.
-	 * @exception ArrayIndexOutOfBoundsException if {@code offset} is
-	 * negative, or if {@code offset + frames * 2 > samples.length}.
-	 * @exception IllegalArgumentException if {@code frames} is negative,
-	 * or if {@code amplitude} is a non-number or is negative.
-	 * @see render(float[],int,int,float,float,boolean,boolean)
-	 */
-	render(
-		/*float[]*/ samples: number[],
-		offset: number,
-		frames: number,
-		amplitude: number
-	): void;
-
-	/**
-	 * Generate output samples. This method is equivalent to
-	 * {@code render(samples, offset, frames, left, right, true, true)}.
-	 * <br><br>
-	 * For information regarding the operations of this method, see
-	 * {@link render(float[],int,int,float,float,boolean,boolean)}.
-	 * @param samples Output sample buffer.
-	 * @param offset Index in {@code samples} of the first audio frame to
-	 * output.
-	 * @param frames The number of audio frames to output.
-	 * @param left A multiplier that is applied to all left-stereo samples
-	 * generated.
-	 * @param right A multiplier that is applied to all right-stereo
-	 * samples generated.
-	 * @exception NullPointerException if {@code samples} is {@code null}.
-	 * @exception ArrayIndexOutOfBoundsException if {@code offset} is
-	 * negative, or if {@code offset + frames * 2 > samples.length}.
-	 * @exception IllegalArgumentException if {@code frames} is negative,
-	 * or if {@code left} or {@code right} is a non-number or is negative.
-	 * @see render(float[],int,int,float,float,boolean,boolean)
-	 */
-	render(
-		/*float[]*/ samples: number[],
-		offset: number,
-		frames: number,
-		left: number,
-		right: number
-	): void;
-
-	/**
 	 * Generate output samples. Sample values range from -1.0f minimum to
 	 * +1.0f maximum. Sample buffers are interleaved stereo: even-numbered
 	 * indexes are for the left channel and odd-numbered indexes are for
@@ -296,12 +223,9 @@ export interface SamplerInstance {
 	 * negative, or if {@code offset + frames * 2 > samples.length}.
 	 * @exception IllegalArgumentException if {@code frames} is negative,
 	 * or if {@code left} or {@code right} is a non-number or is negative.
-	 * @see render(float[],int,int)
-	 * @see render(float[],int,int,float)
-	 * @see render(float[],int,int,float,float)
 	 */
 	render(
-		/*float[]*/ samples: number[],
+		samples: number[],
 		offset: number,
 		frames: number,
 		left: number,
