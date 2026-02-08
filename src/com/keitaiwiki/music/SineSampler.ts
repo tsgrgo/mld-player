@@ -18,14 +18,14 @@ class Channel {
 class Note {
 	advance: number | undefined; // Amount to increment phase per frame
 	channel: Channel | undefined; // Encapsulating channel
-	freqBase: number | undefined; // Base frequency
+	freqBase = 0; // Base frequency
 	playing = false; // Note is currently active on its key
-	volBase: number | undefined; // Base volume
-	volLeftLevel: number | undefined; // Current left stereo volume
+	volBase = 0; // Base volume
+	volLeftLevel = 0; // Current left stereo volume
 	volLeftTarget: number | undefined; // Target left stereo volume
-	volRightLevel: number | undefined; // Current right stereo volume
+	volRightLevel = 0; // Current right stereo volume
 	volRightTarget: number | undefined; // Target right stereo volume
-	wavPhase: number | undefined; // Position in wave period
+	wavPhase = 0; // Position in wave period
 }
 
 /**
@@ -129,7 +129,7 @@ class Instance implements SamplerInstance {
 			return;
 
 		// Working variables
-		let chan = this.channels[channel];
+		const chan = this.channels[channel];
 		let note = chan.notesOn[A4 + key];
 
 		// No note is currently playing on the specified key
@@ -197,60 +197,14 @@ class Instance implements SamplerInstance {
 	}
 
 	// Generate output samples.
-	public render(samples: number[], offset: number, frames: number): void {
-		this.render(samples, offset, frames, 1, true, true);
-	}
-
-	// Generate output samples.
 	public render(
 		samples: number[],
 		offset: number,
 		frames: number,
-		amplitude: number
-	): void {
-		this.render(samples, offset, frames, amplitude, true, true);
-	}
-
-	// Generate output samples.
-	public render(
-		samples: number[],
-		offset: number,
-		frames: number,
-		amplitude: number,
-		erase: boolean,
-		clamp: boolean
-	): void {
-		this.render(
-			samples,
-			offset,
-			frames,
-			amplitude,
-			amplitude,
-			erase,
-			clamp
-		);
-	}
-
-	// Generate output samples.
-	public render(
-		samples: number[],
-		offset: number,
-		frames: number,
-		left: number,
-		right: number
-	): void {
-		this.render(samples, offset, frames, left, right, true, true);
-	}
-
-	// Generate output samples.
-	public render(
-		samples: number[],
-		offset: number,
-		frames: number,
-		left: number,
-		right: number,
-		erase: boolean,
-		clamp: boolean
+		left = 1,
+		right = 1,
+		erase = true,
+		clamp = true
 	): void {
 		// Error checking
 		if (samples == null) throw new Error('A sample buffer is required.');
