@@ -245,9 +245,7 @@ export class MLD {
 		//         "Invalid range in byte buffer.");
 		// }
 
-		// Parse the data
-		const stream = new ByteArrayInputStream(data /*, offset, length*/);
-		this.parse(new DataInputStream(stream));
+		this.parse(data);
 	}
 
 	// /**
@@ -335,13 +333,13 @@ export class MLD {
 		if (reader.u32() != FOURCC_ADAT)
 			throw new Error('Missing "adat" chunk.');
 		const ret = new ADPCM();
-		ret.data = reader.bytes(reader.u32());
+		ret.data = new Uint8Array(reader.bytes(reader.u32()));
 		return ret;
 	}
 
 	// Measure the duration and tick counters
 	private inspect(): void {
-		const tempo = 60.0 / (48 * 128);
+		let tempo = 60.0 / (48 * 128);
 		let tickNow = 0;
 		const trkPos = new Array<number>(this.tracks.length);
 		const trkUntil = new Array<number>(this.tracks.length);
@@ -453,24 +451,30 @@ export class MLD {
 	}
 
 	// Parse an MLD file
-	private parse(stream: DataInputStream): void {
+	private parse(bytes: Uint8Array): void {
+		const view = new DataView(
+			bytes.buffer,
+			bytes.byteOffset,
+			bytes.byteLength
+		);
+
 		// File signature
-		if (stream.readInt() != FOURCC_MELO)
-			throw new Error('Missing "melo" signature.');
+		const sig = view.getInt32(0, false);
+		if (sig != FOURCC_MELO) throw new Error('Missing "melo" signature.');
 
 		// File length
-		const length = stream.readInt();
+		const length = view.getInt32(4, false);
 		if (length < 0) throw new Error('Unsupported file length.');
 
 		// Read the file into a byte array
-		const data = new Uint8Array(8 + length);
-		let offset = 8;
+		const total = 8 + length;
 
-		while (offset < data.length) {
-			const readed = stream.read(data, offset, data.length - offset);
-			if (readed == -1) throw new Error('Unexpected EOF.');
-			offset += readed;
-		}
+		if (bytes.length < total) throw new Error('Unexpected EOF.');
+
+		const data = bytes.slice(0, total);
+
+		console.log('length', length);
+		console.log('data', data);
 
 		// Default fields
 		this.adpcms = [];
@@ -536,6 +540,8 @@ export class MLD {
 
 		// Content type
 		this.contentType = reader.u16();
+		console.log(this.contentType);
+
 		if ((this.contentType & 0xff00) == 0x0200) {
 			const bits = this.contentType & 0x00ff;
 			this.hasMusicEvents = (bits & 0x01) != 0;
