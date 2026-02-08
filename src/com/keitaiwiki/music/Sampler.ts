@@ -12,7 +12,7 @@ export interface Sampler {
 	 * @exception IllegalArgumentException if {@code sampleRate} is a
 	 * non-number or is less than or equal to zero.
 	 */
-	instance(sampleRate: number): Instance;
+	instance(sampleRate: number): SamplerInstance;
 }
 
 /**
@@ -41,7 +41,7 @@ export interface Sampler {
  * </table>
  * @see Sampler
  */
-export interface Instance {
+export interface SamplerInstance {
 	/**
 	 * Specify a channel's program bank. The bank expands the total number
 	 * of programs available to a channel.<br><br>
@@ -67,7 +67,7 @@ export interface Instance {
 	isFinished(): boolean;
 
 	/**
-	 * Deactivate a key that has previoulsy been activated on a channel.
+	 * Deactivate a key that has previously been activated on a channel.
 	 * If no key is currently active on the channel, no action is taken.
 	 * @param channel The index of the channel to configure.
 	 * @param key The number of the key to configure. A value of zero
@@ -110,7 +110,7 @@ export interface Instance {
 	 * each channel's base tuning to determine the effective tuning on that
 	 * channel.<br><br>
 	 * The default master tuning is 0.0f.<br><br>
-	 * For informaiton on the underlying mathematics, see
+	 * For information on the underlying mathematics, see
 	 * {@link keyOn(int,int,int)}.
 	 * @param semitones The number of semitones to detune, where 0.0f
 	 * represents no adjustment. Most MIDI specifications express pitch
@@ -119,7 +119,7 @@ export interface Instance {
 	 * non-number.
 	 * @see pitchBend(int,float)
 	 */
-	masterTune(semitones: number): void;
+	setMasterTune(semitones: number): void;
 
 	/**
 	 * Specify the global volume. The master volume is multiplied by each
@@ -131,7 +131,7 @@ export interface Instance {
 	 * @exception IllegalArgumentException if {@code volume} is a
 	 * non-number or is negative.
 	 */
-	masterVolume(volume: number): void;
+	setMasterVolume(volume: number): void;
 
 	/**
 	 * Specify stereo panning on a channel. Panning ranges from -1.0f for
@@ -151,7 +151,7 @@ export interface Instance {
 	 * channel. The number of semitones is multiplied by the channel's
 	 * current pitch bend range to calculate the effective tuning.<br><br>
 	 * The default pitch bend on all channels is 0.0f.<br><br>
-	 * For informaiton on the underlying mathematics, see
+	 * For information on the underlying mathematics, see
 	 * {@link keyOn(int,int,int)}.
 	 * @param channel The index of the channel to configure.
 	 * @param semitones The number of semitones to detune, where 0.0f
@@ -178,7 +178,7 @@ export interface Instance {
 	pitchBendRange(channel: number, range: number): void;
 
 	/**
-	 * Speicfy a channel's program number. The program corresponds to the
+	 * Specify a channel's program number. The program corresponds to the
 	 * voice or instrument used on the channel.<br><br>
 	 * The default program number on all channels is 0.
 	 * @param channel The index of the channel to configure.
@@ -203,11 +203,7 @@ export interface Instance {
 	 * @exception IllegalArgumentException if {@code frames} is negative.
 	 * @see render(float[],int,int,float,float,boolean,boolean)
 	 */
-	render(
-		/*float[]*/ samples: Uint32Array,
-		offset: number,
-		frames: number
-	): void;
+	render(/*float[]*/ samples: number[], offset: number, frames: number): void;
 
 	/**
 	 * Generate output samples. This method is equivalent to
@@ -229,7 +225,7 @@ export interface Instance {
 	 * @see render(float[],int,int,float,float,boolean,boolean)
 	 */
 	render(
-		/*float[]*/ samples: Uint32Array,
+		/*float[]*/ samples: number[],
 		offset: number,
 		frames: number,
 		amplitude: number
@@ -257,7 +253,7 @@ export interface Instance {
 	 * @see render(float[],int,int,float,float,boolean,boolean)
 	 */
 	render(
-		/*float[]*/ samples: Uint32Array,
+		/*float[]*/ samples: number[],
 		offset: number,
 		frames: number,
 		left: number,
@@ -265,7 +261,7 @@ export interface Instance {
 	): void;
 
 	/**
-	 * Generate output samples. Sample values range from -1.0f mininum to
+	 * Generate output samples. Sample values range from -1.0f minimum to
 	 * +1.0f maximum. Sample buffers are interleaved stereo: even-numbered
 	 * indexes are for the left channel and odd-numbered indexes are for
 	 * the right channel. One "frame" of audio represents the samples for
@@ -305,7 +301,7 @@ export interface Instance {
 	 * @see render(float[],int,int,float,float)
 	 */
 	render(
-		/*float[]*/ samples: Uint32Array,
+		/*float[]*/ samples: number[],
 		offset: number,
 		frames: number,
 		left: number,
@@ -330,7 +326,7 @@ export interface Instance {
 
 	/**
 	 * Process a SysEx message. Functionality that is not part of the
-	 * relevant specificaiton (usually MIDI) is configured through such
+	 * relevant specification (usually MIDI) is configured through such
 	 * messages. The binary format of a SysEx message depends on the
 	 * vendor and the feature being configured.
 	 * @param message The body data of the vendor-exclusive message.
