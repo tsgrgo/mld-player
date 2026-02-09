@@ -1,6 +1,7 @@
 import { MLD } from './com/keitaiwiki/music/MLD';
 import { MLDPlayer } from './com/keitaiwiki/music/MLDPlayer';
 import { SineSampler } from './com/keitaiwiki/music/SineSampler';
+import { downloadAsWav } from './downloadAsWav';
 
 function el<K extends keyof HTMLElementTagNameMap>(
 	tag: K,
@@ -81,6 +82,7 @@ input.addEventListener('change', async () => {
 
 		const samples = new Array<number>(1000000);
 		player.render(samples, 0, 500000);
+		// downloadAsWav(samples);
 		playPCM(samples, 44100);
 		// void playTestAudio(samples);
 	} catch (err) {
