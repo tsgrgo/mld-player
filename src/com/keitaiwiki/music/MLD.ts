@@ -1,38 +1,5 @@
 //////////////////////////////// Constants ////////////////////////////////
 
-// Cuepoints
-const CUEPOINT_START = 0;
-const CUEPOINT_END = 1;
-
-// Event types
-const EVENT_TYPE_UNKNOWN = -1;
-const EVENT_TYPE_NOTE = 0;
-const EVENT_TYPE_EXT_B = 1;
-const EVENT_TYPE_EXT_INFO = 2;
-
-// Event ext-B IDs
-const EVENT_MASTER_VOLUME = 0xb0;
-const EVENT_MASTER_TUNE = 0xb3;
-const EVENT_PART_CONFIGURATION = 0xb9;
-const EVENT_PAUSE = 0xbd;
-const EVENT_STOP = 0xbe;
-const EVENT_RESET = 0xbf;
-const EVENT_TIMEBASE_TEMPO = 0xc0;
-const EVENT_CUEPOINT = 0xd0;
-const EVENT_JUMP = 0xd1;
-const EVENT_NOP = 0xde;
-const EVENT_END_OF_TRACK = 0xdf;
-const EVENT_PROGRAM_CHANGE = 0xe0;
-const EVENT_BANK_CHANGE = 0xe1;
-const EVENT_VOLUME = 0xe2;
-const EVENT_PANPOT = 0xe3;
-const EVENT_PITCHBEND = 0xe4;
-const EVENT_CHANNEL_ASSIGN = 0xe5;
-const EVENT_PITCHBEND_RANGE = 0xe7;
-const EVENT_WAVE_CHANNEL_VOLUME = 0xe8;
-const EVENT_WAVE_CHANNEL_PANPOT = 0xe9;
-const EVENT_X_DRUM_ENABLE = 0xba;
-
 // FourCCs
 const FOURCC_ADAT = 0x61646174; // "adat"
 const FOURCC_AINF = 0x61696e66; // "ainf"
@@ -63,7 +30,7 @@ class ADPCM {
 }
 
 // Sequencer event data class
-class Event {
+export class MLDEvent {
 	// Instance fields
 	data: Uint8Array | undefined; // ext-info and unknown event data
 	channel = 0; // Normalized channel ID, out of 16
@@ -164,7 +131,7 @@ class Reader {
 }
 
 // Event list
-class Track extends Array<Event> {
+export class MLDTrack extends Array<MLDEvent> {
 	cue = 0; // Initial event offset on reset
 	index = 0; // Channel index base
 }
@@ -173,13 +140,46 @@ class Track extends Array<Event> {
  * Decoder for i-melody MLD sequences.
  */
 export class MLD {
+	// Event types
+	public static readonly EVENT_TYPE_UNKNOWN = -1;
+	public static readonly EVENT_TYPE_NOTE = 0;
+	public static readonly EVENT_TYPE_EXT_B = 1;
+	public static readonly EVENT_TYPE_EXT_INFO = 2;
+
+	// Event ext-B IDs
+	public static readonly EVENT_MASTER_VOLUME = 0xb0;
+	public static readonly EVENT_MASTER_TUNE = 0xb3;
+	public static readonly EVENT_PART_CONFIGURATION = 0xb9;
+	public static readonly EVENT_PAUSE = 0xbd;
+	public static readonly EVENT_STOP = 0xbe;
+	public static readonly EVENT_RESET = 0xbf;
+	public static readonly EVENT_TIMEBASE_TEMPO = 0xc0;
+	public static readonly EVENT_CUEPOINT = 0xd0;
+	public static readonly EVENT_JUMP = 0xd1;
+	public static readonly EVENT_NOP = 0xde;
+	public static readonly EVENT_END_OF_TRACK = 0xdf;
+	public static readonly EVENT_PROGRAM_CHANGE = 0xe0;
+	public static readonly EVENT_BANK_CHANGE = 0xe1;
+	public static readonly EVENT_VOLUME = 0xe2;
+	public static readonly EVENT_PANPOT = 0xe3;
+	public static readonly EVENT_PITCHBEND = 0xe4;
+	public static readonly EVENT_CHANNEL_ASSIGN = 0xe5;
+	public static readonly EVENT_PITCHBEND_RANGE = 0xe7;
+	public static readonly EVENT_WAVE_CHANNEL_VOLUME = 0xe8;
+	public static readonly EVENT_WAVE_CHANNEL_PANPOT = 0xe9;
+	public static readonly EVENT_X_DRUM_ENABLE = 0xba;
+
+	// Cuepoints
+	public static readonly CUEPOINT_START = 0;
+	public static readonly CUEPOINT_END = 1;
+
 	// Instance fields
 	adpcms: ADPCM[] = []; // Sample data
 	duration = 0; // Total runtime in seconds, or POSITIVE_INFINITY
 	header?: Uint8Array; // Encoded header chunk
 	tickEnd = 0; // Tick count at the end of the last event
 	tickLoop = -1; // Tick count of the loop destination
-	tracks: Track[] = []; // Event lists
+	tracks: MLDTrack[] = []; // Event lists
 
 	// Content type header fields
 	contentType: number = 0;
@@ -396,8 +396,8 @@ export class MLD {
 
 				// end-of-track
 				if (
-					event.type == EVENT_TYPE_EXT_B &&
-					event.id == EVENT_END_OF_TRACK
+					event.type == MLD.EVENT_TYPE_EXT_B &&
+					event.id == MLD.EVENT_END_OF_TRACK
 				) {
 					trkUntil[i] = -1;
 					continue;
@@ -407,7 +407,7 @@ export class MLD {
 				i--;
 
 				// note
-				if (event.type == EVENT_TYPE_NOTE) {
+				if (event.type == MLD.EVENT_TYPE_NOTE) {
 					this.tickEnd = Math.max(
 						this.tickEnd,
 						tickNow + event.gateTime
@@ -416,19 +416,19 @@ export class MLD {
 				}
 
 				// Next must be ext-B
-				if (event.type != EVENT_TYPE_EXT_B) continue;
+				if (event.type != MLD.EVENT_TYPE_EXT_B) continue;
 
 				// timebase-tempo
-				if ((event.id & 0xf0) == EVENT_TIMEBASE_TEMPO) {
+				if ((event.id & 0xf0) == MLD.EVENT_TIMEBASE_TEMPO) {
 					tempo = 60.0 / (event.timebase * event.tempo);
 					continue;
 				}
 
 				// Next must be cuepoint
-				if (event.id != EVENT_CUEPOINT) continue;
+				if (event.id != MLD.EVENT_CUEPOINT) continue;
 
 				// cuepoint start
-				if (event.cuepoint == CUEPOINT_START) {
+				if (event.cuepoint == MLD.CUEPOINT_START) {
 					this.tickLoop = tickNow;
 					continue;
 				}
@@ -473,9 +473,6 @@ export class MLD {
 
 		const data = bytes.slice(0, total);
 
-		console.log('length', length);
-		console.log('data', data);
-
 		// Default fields
 		this.adpcms = [];
 		this.note = NOTE_3;
@@ -497,13 +494,13 @@ export class MLD {
 	}
 
 	// Parse a track
-	private parseTrack(note: number, index: number, reader: Reader): Track {
+	private parseTrack(note: number, index: number, reader: Reader): MLDTrack {
 		// Error checking
 		if (reader.u32() != FOURCC_TRAC)
 			throw new Error('Missing "trac" chunk.');
 
 		// Working variables
-		const ret = new Track();
+		const ret = new MLDTrack();
 		ret.index = index;
 		reader = reader.reader(reader.u32());
 		const cue = reader.offset + this.cuep[index];
@@ -540,7 +537,6 @@ export class MLD {
 
 		// Content type
 		this.contentType = reader.u16();
-		console.log(this.contentType);
 
 		if ((this.contentType & 0xff00) == 0x0200) {
 			const bits = this.contentType & 0x00ff;
@@ -562,7 +558,7 @@ export class MLD {
 		const numTracks = reader.u8();
 		if (numTracks > 4) throw new Error('Invalid track count: ' + numTracks);
 		this.cuep = new Array<number>(numTracks);
-		this.tracks = new Array<Track>(numTracks);
+		this.tracks = new Array<MLDTrack>(numTracks);
 
 		// Header subchunks
 		while (!reader.isEOF()) {
@@ -684,8 +680,8 @@ export class MLD {
 	////////////////////////// Event Parsing Methods //////////////////////////
 
 	// Parse an event
-	private event(note: number, track: number, reader: Reader): Event {
-		const event = new Event();
+	private event(note: number, track: number, reader: Reader): MLDEvent {
+		const event = new MLDEvent();
 
 		// Common fields
 		event.offset = reader.offset;
@@ -704,57 +700,57 @@ export class MLD {
 
 		// Unknown event
 		if (event.id < 0x80) {
-			event.type = EVENT_TYPE_UNKNOWN;
+			event.type = MLD.EVENT_TYPE_UNKNOWN;
 			event.data = reader.bytes(2);
 			return event;
 		}
 
 		// Common ext-B processing
-		event.type = EVENT_TYPE_EXT_B;
+		event.type = MLD.EVENT_TYPE_EXT_B;
 		event.param = reader.u8();
 		event.channelIndex = event.param >> 6;
 		event.channel = (track << 2) | event.channelIndex;
 
 		// timebase-tempo event
-		if ((event.id & 0xf0) == EVENT_TIMEBASE_TEMPO)
+		if ((event.id & 0xf0) == MLD.EVENT_TIMEBASE_TEMPO)
 			return this.eventTimebaseTempo(event);
 
 		// Other event
 		switch (event.id) {
 			// Events that need further processing
-			case EVENT_BANK_CHANGE:
+			case MLD.EVENT_BANK_CHANGE:
 				return this.eventBankChange(event);
-			case EVENT_CUEPOINT:
+			case MLD.EVENT_CUEPOINT:
 				return this.eventCuepoint(event);
-			case EVENT_JUMP:
+			case MLD.EVENT_JUMP:
 				return this.eventJump(event);
-			case EVENT_MASTER_TUNE:
+			case MLD.EVENT_MASTER_TUNE:
 				return this.eventMasterTune(event);
-			case EVENT_MASTER_VOLUME:
+			case MLD.EVENT_MASTER_VOLUME:
 				return this.eventMasterVolume(event);
-			case EVENT_PANPOT:
+			case MLD.EVENT_PANPOT:
 				return this.eventPanPot(event);
-			case EVENT_PITCHBEND:
+			case MLD.EVENT_PITCHBEND:
 				return this.eventPitchBend(event);
-			case EVENT_PITCHBEND_RANGE:
+			case MLD.EVENT_PITCHBEND_RANGE:
 				return this.eventPitchBendRange(event);
-			case EVENT_PROGRAM_CHANGE:
+			case MLD.EVENT_PROGRAM_CHANGE:
 				return this.eventProgramChange(event);
-			case EVENT_VOLUME:
+			case MLD.EVENT_VOLUME:
 				return this.eventVolume(event);
-			case EVENT_X_DRUM_ENABLE:
+			case MLD.EVENT_X_DRUM_ENABLE:
 				return this.eventDrumEnable(event);
 
 			// Events that do not need further processing
-			case EVENT_CHANNEL_ASSIGN: // Not implemented
-			case EVENT_PART_CONFIGURATION: // Not implemented
-			case EVENT_WAVE_CHANNEL_PANPOT: // Not implemented
-			case EVENT_WAVE_CHANNEL_VOLUME: // Not implemented
-			case EVENT_END_OF_TRACK:
-			case EVENT_NOP:
-			case EVENT_PAUSE:
-			case EVENT_RESET:
-			case EVENT_STOP:
+			case MLD.EVENT_CHANNEL_ASSIGN: // Not implemented
+			case MLD.EVENT_PART_CONFIGURATION: // Not implemented
+			case MLD.EVENT_WAVE_CHANNEL_PANPOT: // Not implemented
+			case MLD.EVENT_WAVE_CHANNEL_VOLUME: // Not implemented
+			case MLD.EVENT_END_OF_TRACK:
+			case MLD.EVENT_NOP:
+			case MLD.EVENT_PAUSE:
+			case MLD.EVENT_RESET:
+			case MLD.EVENT_STOP:
 				break;
 
 			// Unrecognized events
@@ -764,33 +760,33 @@ export class MLD {
 	}
 
 	// Parse a bank-change event
-	private eventBankChange(event: Event) {
+	private eventBankChange(event: MLDEvent) {
 		event.bank = event.param & 0x3f;
 		return event;
 	}
 
 	// Parse a cuepoint event
-	private eventCuepoint(event: Event) {
+	private eventCuepoint(event: MLDEvent) {
 		event.cuepoint = event.param;
 		return event;
 	}
 
 	// Parse a drum-enable event
-	private eventDrumEnable(event: Event) {
+	private eventDrumEnable(event: MLDEvent) {
 		event.channel = (event.param >> 3) & 15;
 		event.enable = (event.param & 1) != 0;
 		return event;
 	}
 
 	// Parse an ext-info event
-	private eventExtInfo(event: Event, reader: Reader) {
-		event.type = EVENT_TYPE_EXT_INFO;
+	private eventExtInfo(event: MLDEvent, reader: Reader) {
+		event.type = MLD.EVENT_TYPE_EXT_INFO;
 		event.data = reader.bytes(reader.u16());
 		return event;
 	}
 
 	// Parse a jump event
-	private eventJump(event: Event) {
+	private eventJump(event: MLDEvent) {
 		event.jumpCount = event.param & 15;
 		event.jumpId = (event.param >> 4) & 3;
 		event.jumpPoint = event.param >> 6;
@@ -798,13 +794,13 @@ export class MLD {
 	}
 
 	// Parse a master-tune event
-	private eventMasterTune(event: Event) {
+	private eventMasterTune(event: MLDEvent) {
 		event.semitones = ((event.param & 0x7f) - 64) / 64.0;
 		return event;
 	}
 
 	// Parse a master-volume event
-	private eventMasterVolume(event: Event) {
+	private eventMasterVolume(event: MLDEvent) {
 		event.volume = this.volumeToAmplitude((event.param & 0x7f) / 127.0);
 		return event;
 	}
@@ -813,11 +809,11 @@ export class MLD {
 	private eventNote(
 		note: number,
 		track: number,
-		event: Event,
+		event: MLDEvent,
 		reader: Reader
 	) {
 		// Common processing
-		event.type = EVENT_TYPE_NOTE;
+		event.type = MLD.EVENT_TYPE_NOTE;
 		event.channelIndex = event.status >> 6;
 		event.gateTime = reader.u8();
 		event.keyNumber = event.status & 63;
@@ -842,44 +838,44 @@ export class MLD {
 	}
 
 	// Parse a panpot event
-	private eventPanPot(event: Event) {
+	private eventPanPot(event: MLDEvent) {
 		const param = event.param & 0x3f;
 		event.panpot = param < 32 ? param / 32.0 - 1 : (param - 32) / 31.0;
 		return event;
 	}
 
 	// Parse a pitchbend event
-	private eventPitchBend(event: Event) {
+	private eventPitchBend(event: MLDEvent) {
 		event.semitones = ((event.param & 0x3f) - 32) / 3200.0;
 		return event;
 	}
 
 	// Parse a pitchbend-range event
-	private eventPitchBendRange(event: Event) {
+	private eventPitchBendRange(event: MLDEvent) {
 		event.range = event.param & 0x3f;
 		return event;
 	}
 
 	// Parse a program-change event
-	private eventProgramChange(event: Event) {
+	private eventProgramChange(event: MLDEvent) {
 		event.program = event.param & 0x3f;
 		return event;
 	}
 
 	// Parse a timebase-tempo event
-	private eventTimebaseTempo(event: Event) {
+	private eventTimebaseTempo(event: MLDEvent) {
 		event.bank = event.id;
 		event.tempo = event.param;
 		event.timebase =
 			(event.id & 7) == 7
 				? -1
 				: ((event.id & 15) > 7 ? 15 : 6) << (event.id & 7);
-		event.id = EVENT_TIMEBASE_TEMPO;
+		event.id = MLD.EVENT_TIMEBASE_TEMPO;
 		return event;
 	}
 
 	// Parse a volume event
-	private eventVolume(event: Event) {
+	private eventVolume(event: MLDEvent) {
 		event.volume = this.volumeToAmplitude((event.param & 0x3f) / 63.0);
 		return event;
 	}
