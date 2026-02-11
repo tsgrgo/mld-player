@@ -9,6 +9,7 @@
 		"preview": "vite preview"
 	},
 	"dependencies": {
+		"@types/audioworklet": "^0.0.94",
 		"typescript": "~5.9.3",
 		"vite": "^7.2.4"
 	},
