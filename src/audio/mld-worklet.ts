@@ -2,9 +2,9 @@ import { MLD } from '../com/keitaiwiki/music/MLD';
 import { MLDPlayer } from '../com/keitaiwiki/music/MLDPlayer';
 import { SineSampler } from '../com/keitaiwiki/music/SineSampler';
 
-type InitMsg = { type: 'init'; mld: MLD };
+type LoadMsg = { type: 'load'; buffer: ArrayBuffer; fileName?: string };
 type VolumeMsg = { type: 'volume'; value: number };
-type Msg = InitMsg | VolumeMsg;
+type Msg = LoadMsg | VolumeMsg;
 
 class MLDPlayerProcessor extends AudioWorkletProcessor {
 	private player: MLDPlayer | null = null;
@@ -13,14 +13,42 @@ class MLDPlayerProcessor extends AudioWorkletProcessor {
 
 	constructor() {
 		super();
-		this.port.onmessage = (event: MessageEvent<Msg>) => {
-			const msg = event.data;
-			if (msg.type === 'init') {
-				const sampler = new SineSampler();
-				// sampleRate is a global in AudioWorkletGlobalScope
-				this.player = new MLDPlayer(msg.mld, sampler, sampleRate);
-			} else if (msg.type === 'volume') {
+
+		this.port.onmessage = (e: MessageEvent<Msg>) => {
+			const msg = e.data;
+
+			if (msg.type === 'volume') {
 				this.volume = msg.value;
+				return;
+			}
+
+			if (msg.type === 'load') {
+				try {
+					const bytes = new Uint8Array(msg.buffer);
+					const mld = new MLD(bytes);
+
+					const sampler = new SineSampler();
+					this.player = new MLDPlayer(mld, sampler, sampleRate);
+
+					// Send metadata back to main thread so you can update UI
+					const result = {
+						type: 'info',
+						title: mld.getTitle() ?? null,
+						version: mld.getVersion() ?? null,
+						date: mld.getDate() ?? null,
+						copyright: mld.getCopyright() ?? null,
+						durationLooping: mld.getDuration(false),
+						durationNoLoop: mld.getDuration(true)
+					};
+
+					console.log(result);
+					this.port.postMessage(result);
+				} catch (err) {
+					const message =
+						err instanceof Error ? err.message : String(err);
+					this.player = null;
+					this.port.postMessage({ type: 'error', message });
+				}
 			}
 		};
 	}
@@ -44,7 +72,11 @@ class MLDPlayerProcessor extends AudioWorkletProcessor {
 			this.renderBuffer = new Float32Array(needed);
 		}
 
+		console.log(needed);
+
 		this.player.render(this.renderBuffer, 0, frames);
+
+		if (this.player.isFinished()) return false;
 
 		for (let i = 0; i < frames; i++) {
 			left[i] = this.renderBuffer[i * 2] * this.volume;

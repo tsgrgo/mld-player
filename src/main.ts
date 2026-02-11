@@ -1,7 +1,4 @@
-import { MLD } from './com/keitaiwiki/music/MLD';
-import { MLDPlayer } from './com/keitaiwiki/music/MLDPlayer';
-import { SineSampler } from './com/keitaiwiki/music/SineSampler';
-import { downloadAsWav } from './downloadAsWav';
+import { playFileInWorklet } from './playMLD';
 
 function el<K extends keyof HTMLElementTagNameMap>(
 	tag: K,
@@ -56,42 +53,44 @@ input.addEventListener('change', async () => {
 
 	status.textContent = 'Reading...';
 
-	try {
-		const bytes = await readAsUint8Array(file);
+	playFileInWorklet(file);
 
-		// If your API is different, change this line accordingly.
-		// e.g. const mld = MLD.parse(bytes);
-		const mld = new MLD(bytes);
+	// try {
+	// 	const bytes = await readAsUint8Array(file);
 
-		status.textContent = 'Parsed OK.';
+	// 	// If your API is different, change this line accordingly.
+	// 	// e.g. const mld = MLD.parse(bytes);
+	// 	const mld = new MLD(bytes);
 
-		pFile.textContent = `File: ${file.name} (${bytes.length} bytes)`;
-		pTitle.textContent = `Title: ${mld.getTitle() || '(none)'}`;
-		pVersion.textContent = `Version: ${mld.getVersion() || '(none)'}`;
-		pDate.textContent = `Date: ${mld.getDate() || '(none)'}`;
-		pCopyright.textContent = `Copyright: ${mld.getCopyright() || '(none)'}`;
-		pDurationLooping.textContent = `Duration (with looping): ${mld.getDuration(
-			false
-		)}`;
-		pDurationNoLoop.textContent = `Duration (without looping): ${mld.getDuration(
-			true
-		)}`;
+	// 	status.textContent = 'Parsed OK.';
 
-		// const sampler = new SineSampler();
-		// const player = new MLDPlayer(mld, sampler, 44100);
+	// 	pFile.textContent = `File: ${file.name} (${bytes.length} bytes)`;
+	// 	pTitle.textContent = `Title: ${mld.getTitle() || '(none)'}`;
+	// 	pVersion.textContent = `Version: ${mld.getVersion() || '(none)'}`;
+	// 	pDate.textContent = `Date: ${mld.getDate() || '(none)'}`;
+	// 	pCopyright.textContent = `Copyright: ${mld.getCopyright() || '(none)'}`;
+	// 	pDurationLooping.textContent = `Duration (with looping): ${mld.getDuration(
+	// 		false
+	// 	)}`;
+	// 	pDurationNoLoop.textContent = `Duration (without looping): ${mld.getDuration(
+	// 		true
+	// 	)}`;
 
-		playMLD(mld);
+	// 	// const sampler = new SineSampler();
+	// 	// const player = new MLDPlayer(mld, sampler, 44100);
 
-		// const samples = new Array<number>(1000000);
-		// player.render(samples, 0, 500000);
-		// // downloadAsWav(samples);
-		// playPCM(samples, 44100);
-		// // void playTestAudio(samples);
-	} catch (err) {
-		status.textContent = 'Failed to parse.';
-		const msg = err instanceof Error ? err.message : String(err);
-		pFile.textContent = `Error: ${msg}`;
-	}
+	// 	playMLD(mld);
+
+	// 	// const samples = new Array<number>(1000000);
+	// 	// player.render(samples, 0, 500000);
+	// 	// // downloadAsWav(samples);
+	// 	// playPCM(samples, 44100);
+	// 	// // void playTestAudio(samples);
+	// } catch (err) {
+	// 	status.textContent = 'Failed to parse.';
+	// 	const msg = err instanceof Error ? err.message : String(err);
+	// 	pFile.textContent = `Error: ${msg}`;
+	// }
 });
 
 root.append(
@@ -106,56 +105,3 @@ root.append(
 	pDurationLooping,
 	pDurationNoLoop
 );
-
-function playPCM(pcmData: number[], sampleRate: number, channels = 2) {
-	const audioContext = new AudioContext();
-
-	const float32 = new Float32Array(pcmData);
-
-	const frameCount = float32.length / channels;
-	const audioBuffer = audioContext.createBuffer(
-		channels,
-		frameCount,
-		sampleRate
-	);
-
-	for (let ch = 0; ch < channels; ch++) {
-		const channelData = audioBuffer.getChannelData(ch);
-		for (let i = 0; i < frameCount; i++) {
-			channelData[i] = float32[i * channels + ch];
-		}
-	}
-
-	const source = audioContext.createBufferSource();
-	source.buffer = audioBuffer;
-	source.connect(audioContext.destination);
-	source.start();
-}
-
-function playMLD(mld: MLD) {
-	const sampler = new SineSampler();
-	const player = new MLDPlayer(mld, sampler, 44100);
-
-	const audioCtx = new AudioContext();
-
-	const gainNode = audioCtx.createGain();
-	gainNode.gain.value = 0.5; // master volume
-
-	const processorNode = audioCtx.createScriptProcessor(4096, 0, 2);
-	processorNode.onaudioprocess = function (e) {
-		const bufferLength = e.outputBuffer.length;
-
-		const renderBuffer = new Float32Array(bufferLength * 2);
-		player.render(renderBuffer, 0, bufferLength);
-
-		for (let ch = 0; ch < 2; ch++) {
-			const channelData = e.outputBuffer.getChannelData(ch);
-			for (let i = 0; i < bufferLength; i++) {
-				channelData[i] = renderBuffer[i * 2 + ch];
-			}
-		}
-	};
-
-	processorNode.connect(gainNode);
-	gainNode.connect(audioCtx.destination);
-}
