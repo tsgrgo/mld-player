@@ -551,7 +551,7 @@ export class MLDPlayer {
 	///////////////////////////// Private Methods /////////////////////////////
 
 	// Process events on a track
-	public process(track: Track, ticks: number): void {
+	private process(track: Track, ticks: number): void {
 		// The track has finished
 		if (track.finished) return;
 
@@ -587,12 +587,12 @@ export class MLDPlayer {
 	}
 
 	// Compute the number of output frames in one event tick
-	public setTempo(timebase: number, tempo: number): void {
+	private setTempo(timebase: number, tempo: number): void {
 		this.framesPerTick = (60 * this.sampleRate) / (timebase * tempo);
 	}
 
 	// Specify the event offset of a track
-	public setTrackOffset(track: Track, offset: number): void {
+	private setTrackOffset(track: Track, offset: number): void {
 		// Configure the track
 		track.offset = offset;
 		track.finished = offset >= track.mld.length;
@@ -606,7 +606,7 @@ export class MLDPlayer {
 	}
 
 	// Determine how many ticks can be processed until a note expires
-	public untilNote(): number {
+	private untilNote(): number {
 		let ret = -1;
 		for (const chan of this.channels)
 			for (const note of chan.notesOut) {
@@ -616,7 +616,7 @@ export class MLDPlayer {
 	}
 
 	// Determine how many ticks can be processed until the next event
-	public untilTrack(): number {
+	private untilTrack(): number {
 		let ret = -1;
 		for (const track of this.tracks) {
 			if (track.finished) continue;
@@ -628,13 +628,13 @@ export class MLDPlayer {
 	////////////////////////////// Event Methods //////////////////////////////
 
 	// bank-change
-	public evtBankChange(track: Track, event: MLDEvent): void {
+	private evtBankChange(track: Track, event: MLDEvent): void {
 		this.sampler.bankChange(event.channel, event.bank);
 		this.setTrackOffset(track, track.offset + 1);
 	}
 
 	// cuepoint
-	public evtCuepoint(track: Track, event: MLDEvent): void {
+	private evtCuepoint(track: Track, event: MLDEvent): void {
 		// cuepoint-end
 		if (
 			event.cuepoint == MLD.CUEPOINT_END &&
@@ -666,18 +666,18 @@ export class MLDPlayer {
 	}
 
 	// drum-enable
-	public evtDrumEnable(track: Track, event: MLDEvent): void {
+	private evtDrumEnable(track: Track, event: MLDEvent): void {
 		this.sampler.drumEnable(event.channel, event.enable);
 		this.setTrackOffset(track, track.offset + 1);
 	}
 
 	// end-of-track
-	public evtEndOfTrack(track: Track, event: MLDEvent): void {
+	private evtEndOfTrack(track: Track, event: MLDEvent): void {
 		track.finished = true;
 	}
 
 	// ext-B event
-	public evtExtB(track: Track, e: MLDEvent): void {
+	private evtExtB(track: Track, e: MLDEvent): void {
 		switch (e.id) {
 			case MLD.EVENT_BANK_CHANGE:
 				this.evtBankChange(track, e);
@@ -734,13 +734,13 @@ export class MLDPlayer {
 	}
 
 	// ext-info event
-	public evtExtInfo(track: Track, e: MLDEvent): void {
+	private evtExtInfo(track: Track, e: MLDEvent): void {
 		this.sampler.sysEx(e.data!);
 		this.setTrackOffset(track, track.offset + 1);
 	}
 
 	// note
-	public evtNote(track: Track, event: MLDEvent): void {
+	private evtNote(track: Track, event: MLDEvent): void {
 		const chan = this.channels[event.channel];
 		let note = chan.notesOn[A4 + event.key];
 
@@ -782,43 +782,43 @@ export class MLDPlayer {
 	}
 
 	// master-volume
-	public evtMasterVolume(track: Track, event: MLDEvent): void {
+	private evtMasterVolume(track: Track, event: MLDEvent): void {
 		this.sampler.setMasterVolume(event.volume);
 		this.setTrackOffset(track, track.offset + 1);
 	}
 
 	// master-tune
-	public evtMasterTune(track: Track, event: MLDEvent): void {
+	private evtMasterTune(track: Track, event: MLDEvent): void {
 		this.sampler.setMasterTune(event.semitones);
 		this.setTrackOffset(track, track.offset + 1);
 	}
 
 	// panpot
-	public evtPanPot(track: Track, event: MLDEvent): void {
+	private evtPanPot(track: Track, event: MLDEvent): void {
 		this.sampler.panpot(event.channel, event.panpot);
 		this.setTrackOffset(track, track.offset + 1);
 	}
 
 	// pitchbend
-	public evtPitchBend(track: Track, event: MLDEvent): void {
+	private evtPitchBend(track: Track, event: MLDEvent): void {
 		this.sampler.pitchBend(event.channel, event.semitones);
 		this.setTrackOffset(track, track.offset + 1);
 	}
 
 	// pitchbend-range
-	public evtPitchRange(track: Track, event: MLDEvent): void {
+	private evtPitchRange(track: Track, event: MLDEvent): void {
 		this.sampler.pitchBendRange(event.channel, event.range);
 		this.setTrackOffset(track, track.offset + 1);
 	}
 
 	// program-change
-	public evtProgramChange(track: Track, event: MLDEvent): void {
+	private evtProgramChange(track: Track, event: MLDEvent): void {
 		this.sampler.programChange(event.channel, event.program);
 		this.setTrackOffset(track, track.offset + 1);
 	}
 
 	// timebase-tempo
-	public evtTimebaseTempo(track: Track, event: MLDEvent): void {
+	private evtTimebaseTempo(track: Track, event: MLDEvent): void {
 		if (event.timebase == -1) return;
 		const prev = this.framesPerTick;
 		this.setTempo(event.timebase, event.tempo);
@@ -827,7 +827,7 @@ export class MLDPlayer {
 	}
 
 	// volume
-	public evtVolume(track: Track, event: MLDEvent): void {
+	private evtVolume(track: Track, event: MLDEvent): void {
 		this.sampler.volume(event.channel, event.volume);
 		this.setTrackOffset(track, track.offset + 1);
 	}
