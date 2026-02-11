@@ -518,7 +518,7 @@ export class MLD {
 		try {
 			return new TextDecoder('Shift_JIS').decode(bytes);
 		} catch (e) {
-			return '';
+			return `${e}`;
 		}
 	}
 

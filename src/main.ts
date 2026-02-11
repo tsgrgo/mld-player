@@ -1,4 +1,4 @@
-import { playFileInWorklet } from './playMLD';
+import { playMldInWorklet } from './mld/playMldInWorklet';
 
 function el<K extends keyof HTMLElementTagNameMap>(
 	tag: K,
@@ -36,12 +36,6 @@ function clearInfo() {
 	pDurationNoLoop.textContent = '';
 }
 
-async function readAsUint8Array(file: File): Promise<Uint8Array> {
-	const buf = await file.arrayBuffer();
-	return new Uint8Array(buf);
-}
-
-// eslint-disable-next-line @typescript-eslint/no-misused-promises
 input.addEventListener('change', async () => {
 	clearInfo();
 
@@ -53,7 +47,7 @@ input.addEventListener('change', async () => {
 
 	status.textContent = 'Reading...';
 
-	playFileInWorklet(file);
+	playMldInWorklet(file);
 
 	// try {
 	// 	const bytes = await readAsUint8Array(file);

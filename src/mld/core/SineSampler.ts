@@ -389,7 +389,7 @@ class Instance implements SamplerInstance {
 
 	// Generate a sample on a note
 	private sample(note: Note, advance: number): number {
-		const ret = Math.sign(Math.sin(note.wavPhase * Math.PI * 2));
+		const ret = Math.sin(note.wavPhase * Math.PI * 2);
 		note.wavPhase = (note.wavPhase + advance) % 1;
 		return ret;
 	}
