@@ -225,7 +225,7 @@ export interface SamplerInstance {
 	 * or if {@code left} or {@code right} is a non-number or is negative.
 	 */
 	render(
-		samples: number[],
+		samples: Float32Array,
 		offset: number,
 		frames: number,
 		left: number,

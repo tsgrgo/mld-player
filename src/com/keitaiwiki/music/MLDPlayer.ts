@@ -336,7 +336,7 @@ export class MLDPlayer {
 	 * @see render(float[],int,int,float,float)
 	 */
 	public render(
-		samples: number[] | null,
+		samples: Float32Array | null,
 		offset: number,
 		frames: number,
 		left = 1,

@@ -77,14 +77,16 @@ input.addEventListener('change', async () => {
 			true
 		)}`;
 
-		const sampler = new SineSampler();
-		const player = new MLDPlayer(mld, sampler, 44100);
+		// const sampler = new SineSampler();
+		// const player = new MLDPlayer(mld, sampler, 44100);
 
-		const samples = new Array<number>(1000000);
-		player.render(samples, 0, 500000);
-		// downloadAsWav(samples);
-		playPCM(samples, 44100);
-		// void playTestAudio(samples);
+		playMLD(mld);
+
+		// const samples = new Array<number>(1000000);
+		// player.render(samples, 0, 500000);
+		// // downloadAsWav(samples);
+		// playPCM(samples, 44100);
+		// // void playTestAudio(samples);
 	} catch (err) {
 		status.textContent = 'Failed to parse.';
 		const msg = err instanceof Error ? err.message : String(err);
@@ -128,4 +130,32 @@ function playPCM(pcmData: number[], sampleRate: number, channels = 2) {
 	source.buffer = audioBuffer;
 	source.connect(audioContext.destination);
 	source.start();
+}
+
+function playMLD(mld: MLD) {
+	const sampler = new SineSampler();
+	const player = new MLDPlayer(mld, sampler, 44100);
+
+	const audioCtx = new AudioContext();
+
+	const gainNode = audioCtx.createGain();
+	gainNode.gain.value = 0.5; // master volume
+
+	const processorNode = audioCtx.createScriptProcessor(4096, 0, 2);
+	processorNode.onaudioprocess = function (e) {
+		const bufferLength = e.outputBuffer.length;
+
+		const renderBuffer = new Float32Array(bufferLength * 2);
+		player.render(renderBuffer, 0, bufferLength);
+
+		for (let ch = 0; ch < 2; ch++) {
+			const channelData = e.outputBuffer.getChannelData(ch);
+			for (let i = 0; i < bufferLength; i++) {
+				channelData[i] = renderBuffer[i * 2 + ch];
+			}
+		}
+	};
+
+	processorNode.connect(gainNode);
+	gainNode.connect(audioCtx.destination);
 }

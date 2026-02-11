@@ -198,7 +198,7 @@ class Instance implements SamplerInstance {
 
 	// Generate output samples.
 	public render(
-		samples: number[],
+		samples: Float32Array,
 		offset: number,
 		frames: number,
 		left = 1,
@@ -296,7 +296,7 @@ class Instance implements SamplerInstance {
 	// Render samples on a channel
 	private chanRender(
 		chan: Channel,
-		samples: number[],
+		samples: Float32Array,
 		offset: number,
 		frames: number,
 		left: number,
@@ -342,7 +342,7 @@ class Instance implements SamplerInstance {
 	// Render samples on a note
 	private noteRender(
 		note: Note,
-		samples: number[],
+		samples: Float32Array,
 		offset: number,
 		frames: number,
 		left: number,
@@ -389,7 +389,7 @@ class Instance implements SamplerInstance {
 
 	// Generate a sample on a note
 	private sample(note: Note, advance: number): number {
-		const ret = Math.sin(note.wavPhase * Math.PI * 2);
+		const ret = Math.sign(Math.sin(note.wavPhase * Math.PI * 2));
 		note.wavPhase = (note.wavPhase + advance) % 1;
 		return ret;
 	}
