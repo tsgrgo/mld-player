@@ -508,7 +508,7 @@ export class MA3Sampler implements Sampler {
 
         /////////////////////////// Static Methods ////////////////////////////
 
-        private static from(defs:string[], isDrum:boolean,  isWave:boolean): Algorithm[] {
+        public static from(defs:string[], isDrum:boolean,  isWave:boolean): Algorithm[] {
             let ret: Algorithm[];
 
             // FM presets
@@ -1558,113 +1558,113 @@ export class MA3Sampler implements Sampler {
         //////////////////////////// Constructors /////////////////////////////
 
         // Template constructor
-        private Operator(byte[] bytes, int offset) {
-            sus   =(bytes[offset + 0] >> 3 &  1) != 0;
-            ksr   = bytes[offset + 0] >> 2 &  1;
-            eam   =(bytes[offset + 0] >> 1 &  1) != 0;
-            evb   =(bytes[offset + 0]      &  1) != 0;
-            multi = bytes[offset + 1] >> 4 & 15;
-            dt    = bytes[offset + 1] >> 1 &  7;
-            xof   =(bytes[offset + 1]      &  1) != 0;
-            ar    = bytes[offset + 2] >> 4 & 15;
-            dr    = bytes[offset + 2]      & 15;
-            sr    = bytes[offset + 3] >> 4 & 15;
-            rr    = bytes[offset + 3]      & 15;
-            sl    = bytes[offset + 4] >> 4 & 15;
-            dam   = bytes[offset + 4] >> 2 &  3;
-            dvb   = bytes[offset + 4]      &  3;
-            tl    = bytes[offset + 5] >> 2 & 63;
-            ksl   = bytes[offset + 5]      &  3;
-            fb    = bytes[offset + 6] >> 5 &  7;
-            ws    = bytes[offset + 6]      & 31;
+        private Operator( bytes:Uint8Array, offset:number) {
+            this.sus   =(bytes[offset + 0] >> 3 &  1) != 0;
+            this.ksr   = bytes[offset + 0] >> 2 &  1;
+            this.eam   =(bytes[offset + 0] >> 1 &  1) != 0;
+            this.evb   =(bytes[offset + 0]      &  1) != 0;
+            this.multi = bytes[offset + 1] >> 4 & 15;
+            this.dt    = bytes[offset + 1] >> 1 &  7;
+            this.xof   =(bytes[offset + 1]      &  1) != 0;
+            this.ar    = bytes[offset + 2] >> 4 & 15;
+            this.dr    = bytes[offset + 2]      & 15;
+            this.sr    = bytes[offset + 3] >> 4 & 15;
+            this.rr    = bytes[offset + 3]      & 15;
+            this.sl    = bytes[offset + 4] >> 4 & 15;
+            this.dam   = bytes[offset + 4] >> 2 &  3;
+            this.dvb   = bytes[offset + 4]      &  3;
+            this.tl    = bytes[offset + 5] >> 2 & 63;
+            this.ksl   = bytes[offset + 5]      &  3;
+            this.fb    = bytes[offset + 6] >> 5 &  7;
+            this.ws    = bytes[offset + 6]      & 31;
         }
 
         // Wave constructor
         private Operator(int offset, byte[] message) {
-            int bits;
+            let bits;
             bits = message[offset++] & 0xFF;
-            sr   = bits >> 4 & 15;
-            xof  =(bits >> 3 &  1) != 0;
-            sus  =(bits >> 1 &  1) != 0;
+            this.sr   = bits >> 4 & 15;
+            this.xof  =(bits >> 3 &  1) != 0;
+            this.sus  =(bits >> 1 &  1) != 0;
             bits = message[offset++] & 0xFF;
-            rr   = bits >> 4 & 15;
-            dr   = bits      & 15;
+            this.rr   = bits >> 4 & 15;
+            this.dr   = bits      & 15;
             bits = message[offset++] & 0xFF;
-            ar   = bits >> 4 & 15;
-            sl   = bits      & 15;
+            this.ar   = bits >> 4 & 15;
+            this.sl   = bits      & 15;
             bits = message[offset++] & 0xFF;
-            tl   = bits >> 2 & 63;
+            this.tl   = bits >> 2 & 63;
             bits = message[offset++] & 0xFF;
-            dam  = bits >> 5 &  3;
-            eam  =(bits >> 4 &  1) != 0;
-            dvb  = bits >> 1 &  3;
-            evb  =(bits      &  1) != 0;
+            this.dam  = bits >> 5 &  3;
+            this.eam  =(bits >> 4 &  1) != 0;
+            this.dvb  = bits >> 1 &  3;
+            this.evb  =(bits      &  1) != 0;
         }
 
         // SysEx constructor
-        private Operator(byte[] message, int offset, boolean diff) {
-            int bits;
+        private Operator(message: Uint8Array,  offset:number,  diff:boolean) {
+            let bits;
             bits  = message[offset++] & 0xFF;
-            sr    = bits >> 4 & 15;
-            xof   =(bits >> 3 &  1) != 0;
-            sus   =(bits >> 1 &  1) != 0;
-            ksr   = bits      &  1;
+            this.sr    = bits >> 4 & 15;
+            this.xof   =(bits >> 3 &  1) != 0;
+            this.sus   =(bits >> 1 &  1) != 0;
+            this.ksr   = bits      &  1;
             bits  = message[offset++] & 0xFF;
-            rr    = bits >> 4 & 15;
-            dr    = bits      & 15;
+            this.rr    = bits >> 4 & 15;
+            this.dr    = bits      & 15;
             bits  = message[offset++] & 0xFF;
-            ar    = bits >> 4 & 15;
-            sl    = bits      & 15;
+            this.ar    = bits >> 4 & 15;
+            this.sl    = bits      & 15;
             bits  = message[offset++] & 0xFF;
-            tl    = bits >> 2 & 63;
-            ksl   = bits      &  3;
+            this.tl    = bits >> 2 & 63;
+            this.ksl   = bits      &  3;
             bits  = message[offset++] & 0xFF;
-            dam   = bits >> 5 &  3;
-            eam   =(bits >> 4 &  1) != 0;
-            dvb   = bits >> 1 &  3;
-            evb   =(bits      &  1) != 0;
+            this.dam   = bits >> 5 &  3;
+            this.eam   =(bits >> 4 &  1) != 0;
+            this.dvb   = bits >> 1 &  3;
+            this.evb   =(bits      &  1) != 0;
             bits  = message[offset++] & 0xFF;
-            multi = bits >> 4 & 15;
-            dt    = bits      &  7;
+            this.multi = bits >> 4 & 15;
+            this.dt    = bits      &  7;
             bits  = message[offset++] & 0xFF;
-            ws    = bits >> 3 & 31;
-            fb    = bits      &  7;
+            this.ws    = bits >> 3 & 31;
+            this.fb    = bits      &  7;
         }
 
         // Playback constructor
-        private Operator(Note note, Operator o) {
+        private Operator( note: Note,  o: Operator) {
 
             // OPL registers
-            ar    = o.ar;
-            dam   = o.dam;
-            dr    = o.dr;
-            dt    = o.dt;
-            dvb   = o.dvb;
-            eam   = o.eam;
-            evb   = o.evb;
-            fb    = o.fb;
-            ksl   = o.ksl;
-            ksr   = o.ksr;
-            multi = o.multi;
-            rr    = o.rr;
-            sl    = o.sl;
-            sr    = o.sr;
-            sus   = o.sus;
-            tl    = o.tl;
-            ws    = o.ws;
-            xof   = o.xof;
+            this.ar    = o.ar;
+            this.dam   = o.dam;
+            this.dr    = o.dr;
+            this.dt    = o.dt;
+            this.dvb   = o.dvb;
+            this.eam   = o.eam;
+            this.evb   = o.evb;
+            this.fb    = o.fb;
+            this.ksl   = o.ksl;
+            this.ksr   = o.ksr;
+            this.multi = o.multi;
+            this.rr    = o.rr;
+            this.sl    = o.sl;
+            this.sr    = o.sr;
+            this.sus   = o.sus;
+            this.tl    = o.tl;
+            this.ws    = o.ws;
+            this.xof   = o.xof;
 
             // Instance fields
-            algorithm = note.algorithm;
-            amPhase   = note.instance.amPhase;
-            envLevel  = 511;
-            envPhase  = 0;
-            envRate   = ar;
-            envStage  = ENV_ATTACK;
-            instance  = note.instance;
+            this.algorithm = note.algorithm;
+            this.amPhase   = note.instance.amPhase;
+            this.envLevel  = 511;
+            this.envPhase  = 0;
+            this.envRate   = ar;
+            this.envStage  = ENV_ATTACK;
+            this.instance  = note.instance;
             this.note = note;
-            oscPhase  = 0;
-            wavSample = 0;
+            this.oscPhase  = 0;
+            this.wavSample = 0;
         }
 
 
@@ -1672,110 +1672,110 @@ export class MA3Sampler implements Sampler {
         /////////////////////////// Private Methods ///////////////////////////
 
         // Frequency has changed
-        private void onFrequency() {
-            envRof = (note.block << 1 | note.f_number >> 8 + NTS & 1) >>
-                ((ksr ^ 1) << 1);
-            kslOut = Math.max(0, KSL_B[ksl] *
-                ((note.block << 3) - KSL_F[note.f_number >> 6]));
+        private  onFrequency(): void {
+            this.envRof = (this.note.block << 1 | this.note.f_number >> 8 + NTS & 1) >>
+                ((this.ksr ^ 1) << 1);
+            this.kslOut = Math.max(0, KSL_B[this.ksl] *
+                ((this.note.block << 3) - KSL_F[this.note.f_number >> 6]));
         }
 
         // Generate a sample on an operator
-        private int sample(int mod, boolean feedback) {
-            int x, y; // Scratch
+        private sample(mod:number, feedback:boolean):number {
+            let x, y; // Scratch
 
             // The envelope has finished
-            if (envStage == ENV_DONE)
+            if (this.envStage == ENV_DONE)
                 return 0;
 
             // FM sample
-            if (!algorithm.isWave) {
-                if (feedback && fb != 0)
-                    mod += fb0 + fb1 >> 9 - fb;
-                fb1 = fb0;
-                x   = WAVES[ws][(oscPhase >> 9) + mod & 1023] + (envOut << 3);
-                fb0 = EXP[x & 0xFF] << 1 >> (x >> 8 & 31) ^ x >> 31;
+            if (!this.algorithm.isWave) {
+                if (feedback && this.fb != 0)
+                    mod += this.fb0 + this.fb1 >> 9 - this.fb;
+                this.fb1 = this.fb0;
+                x   = MA3Sampler.WAVES[this.ws][(this.oscPhase >> 9) + mod & 1023] + (this.envOut << 3);
+                this.fb0 = MA3Sampler.EXP[x & 0xFF] << 1 >> (x >> 8 & 31) ^ x >> 31;
             }
 
             // Wave sample
             else {
-                int[] samples = !algorithm.rm ? instance.wavRam :
-                    MA3_WAVEROM[algorithm.waveId];
+                const samples = !this.algorithm.rm ? this.instance.wavRam :
+                    MA3Sampler.MA3_WAVEROM[this.algorithm.waveId];
 
                 // Select the sample from wave memory
-                if (samples != null && wavSample < algorithm.ep) {
+                if (samples != null && this.wavSample < this.algorithm.ep) {
 
                     // Produce the output sample
-                    x   = (int) Math.floor(wavSample);
-                    fb0 = samples[x] * WAVE_ENV[envOut] / 32767;
+                    x   =  Math.floor(this.wavSample);
+                    this.fb0 = samples[x] * MA3Sampler.WAVE_ENV[this.envOut] / 32767;
 
                     // Advance to the next sample
-                    wavSample += algorithm.wavAdvance;
-                    if (wavSample >= algorithm.ep) {
-                        if (algorithm.lp < algorithm.ep) {
-                            wavSample = (wavSample - algorithm.lp) %
-                                (algorithm.ep - algorithm.lp) + algorithm.lp;
+                    this.wavSample += this.algorithm.wavAdvance;
+                    if (this.wavSample >= this.algorithm.ep) {
+                        if (this.algorithm.lp < this.algorithm.ep) {
+                            this.wavSample = (this.wavSample - this.algorithm.lp) %
+                                (this.algorithm.ep - this.algorithm.lp) + this.algorithm.lp;
                         } else {
-                            wavSample = algorithm.ep;
-                            note.stop();
+                            this.wavSample = this.algorithm.ep;
+                            this.note.stop();
                         }
                     }
 
                 }
 
                 // Do not select a sample from wave memory
-                else fb0 = 0;
+                else this.fb0 = 0;
             }
 
             // Advance the envelope
-            x = envRate == 0 ? 0 : Math.min(63, (envRate << 2) + envRof);
-            envPhase += envRate == 0 ? 0 : (4 | x & 3) << (x >> 2);
-            y = envPhase >> 15;
-            envPhase &= 0x7FFF;
-            switch (envStage) {
+            x = this.envRate == 0 ? 0 : Math.min(63, (this.envRate << 2) + this.envRof);
+            this.envPhase += this.envRate == 0 ? 0 : (4 | x & 3) << (x >> 2);
+            y = this.envPhase >> 15;
+            this.envPhase &= 0x7FFF;
+            switch (this.envStage) {
                 case ENV_ATTACK:
                     if (y == 0)
                         break;
-                    envLevel += ~(envLevel * y >> 3);
-                    if (envLevel <= 0) {
-                        envLevel = 0;
-                        envRate  = dr;
-                        envStage = ENV_DECAY;
+                    this.envLevel += ~(this.envLevel * y >> 3);
+                    if (this.envLevel <= 0) {
+                        this.envLevel = 0;
+                        this.envRate  = this.dr;
+                        this.envStage = ENV_DECAY;
                     }
                     break;
                 case ENV_DECAY:
                 case ENV_SUSTAIN:
                 case ENV_RELEASE:
-                    envLevel += y;
-                    if (envStage == ENV_DECAY && envLevel >= SUSTAINS[sl]) {
-                        envLevel = SUSTAINS[sl];
-                        envRate  = sr;
-                        envStage = ENV_SUSTAIN;
+                    this.envLevel += y;
+                    if (this.envStage == ENV_DECAY && this.envLevel >= MA3Sampler.SUSTAINS[this.sl]) {
+                        this.envLevel = MA3Sampler.SUSTAINS[this.sl];
+                        this.envRate  = this.sr;
+                        this.envStage = ENV_SUSTAIN;
                     }
-                    if (envLevel >= 511) {
-                        envLevel = 511;
-                        envStage = ENV_DONE;
-                        note.onEnvelopeDone();
+                    if (this.envLevel >= 511) {
+                        this.envLevel = 511;
+                        this.envStage = ENV_DONE;
+                        this.note.onEnvelopeDone();
                     }
                     break;
                 case ENV_DONE:
-                    envLevel = 511;
+                    this.envLevel = 511;
                     break;
             }
 
             // Attenuate the envelope output
-            envOut = envLevel + kslOut + (tl << 2);
-            if (eam) {
-                envOut += AM_LFO_A[amPhase >> 12] << dam >> 2;
-                amPhase = (amPhase + AM_LFO_B[algorithm.lfo]) % (0x34000);
+            this.envOut = this.envLevel + this.kslOut + (this.tl << 2);
+            if (this.eam) {
+                this.envOut += MA3Sampler.AM_LFO_A[this.amPhase >> 12] << this.dam >> 2;
+                this.amPhase = (this.amPhase + AM_LFO_B[this.algorithm.lfo]) % (0x34000);
             }
-            envOut = Math.min(Math.max(envOut, 0), 511);
+            this.envOut = Math.min(Math.max(this.envOut, 0), 511);
 
             // Wave drums have no oscillator
-            if (algorithm.isWave)
-                return fb0;
+            if (this.algorithm.isWave)
+                return this.fb0;
 
             // Advance the oscillator
-            oscPhase += (note.f_number<<note.block>>1) * MULTIS[multi] >> 1;
+            this.oscPhase += (note.f_number<<note.block>>1) * MULTIS[this.multi] >> 1;
 
             // According to available resources, the below algorithm should be
             // correct for vibrato, but no significance has been observed and
@@ -1792,7 +1792,7 @@ export class MA3Sampler implements Sampler {
             //        (9 - dvb + ((instance.vibPhase >> 10 & 3) == 3 ? 1 : 0));
             // }
 
-            return fb0;
+            return this.fb0;
         }
 
     }
