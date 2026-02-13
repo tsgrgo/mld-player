@@ -58,7 +58,7 @@ export interface SamplerInstance {
 	 * @param channel The index of the channel to configure.
 	 * @param enable Whether to enable drum notes on the channel.
 	 */
-	drumEnable(channel: number, enable: boolean): number;
+	drumEnable(channel: number, enable: boolean): void;
 
 	/**
 	 * Determine whether or not any notes are producing output.

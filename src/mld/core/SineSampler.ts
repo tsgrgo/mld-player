@@ -85,9 +85,9 @@ class Instance implements SamplerInstance {
 	}
 
 	// Specify whether a channel should play drum notes.
-	public drumEnable(channel: number, enable: boolean): number {
+	public drumEnable(channel: number, enable: boolean): void {
 		// Not implementing
-		return 0;
+		return;
 	}
 
 	// Determine whether or not any notes are producing output.
