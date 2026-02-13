@@ -75,12 +75,63 @@ const MAGIC_F = 684 / 33868800.0;
 const MINUS = 0x80000000; // Wave negative
 const ZERO = 0x1000; // Wave minimum
 
+// function base64decode(b64: string): Uint8Array {
+// 	const clean = b64.replace(/\s+/g, '');
+// 	const bin = atob(clean);
+// 	const bytes = new Uint8Array(bin.length);
+// 	for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i) & 0xff;
+// 	return bytes;
+// }
+
+// const BASE64_TABLE = new Uint8Array(256);
+// BASE64_TABLE.fill(255);
+// for (let i = 0; i < 26; i++) {
+// 	BASE64_TABLE[65 + i] = i; // A-Z
+// 	BASE64_TABLE[97 + i] = 26 + i; // a-z
+// }
+// for (let i = 0; i < 10; i++) {
+// 	BASE64_TABLE[48 + i] = 52 + i; // 0-9
+// }
+// BASE64_TABLE[43] = 62; // +
+// BASE64_TABLE[47] = 63; // /
+
+// function base64decode(b64: string): Uint8Array {
+// 	const clean = b64.replace(/\s+/g, '').replace(/=+$/g, '');
+// 	const len = clean.length;
+
+// 	// 4 chars -> 3 bytes
+// 	const outLen = (len * 3) >> 2;
+// 	const out = new Uint8Array(outLen);
+
+// 	let o = 0;
+// 	let i = 0;
+
+// 	while (i < len) {
+// 		const c0 = BASE64_TABLE[clean.charCodeAt(i++)];
+// 		const c1 = BASE64_TABLE[clean.charCodeAt(i++)];
+// 		const c2 = i < len ? BASE64_TABLE[clean.charCodeAt(i++)] : 255;
+// 		const c3 = i < len ? BASE64_TABLE[clean.charCodeAt(i++)] : 255;
+
+// 		if ((c0 | c1) === 255) throw new Error('Invalid base64');
+
+// 		out[o++] = (c0 << 2) | (c1 >> 4);
+
+// 		if (c2 !== 255) {
+// 			out[o++] = ((c1 & 15) << 4) | (c2 >> 2);
+// 			if (c3 !== 255) {
+// 				out[o++] = ((c2 & 3) << 6) | c3;
+// 			}
+// 		}
+// 	}
+
+// 	return o === out.length ? out : out.slice(0, o);
+// }
+
+import { toByteArray } from 'base64-js';
+
 function base64decode(b64: string): Uint8Array {
 	const clean = b64.replace(/\s+/g, '');
-	const bin = atob(clean);
-	const bytes = new Uint8Array(bin.length);
-	for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i) & 0xff;
-	return bytes;
+	return toByteArray(clean); // Uint8Array
 }
 
 //////////////////////////////// Algorithm ////////////////////////////////
@@ -330,6 +381,8 @@ class Channel {
 //////////////////////////////// Instance /////////////////////////////////
 
 class Instance implements SamplerInstance {
+	sampler: MA3Sampler;
+
 	// Instance fields
 	amPhase = 0; // Amplitude modulator phase
 	bendOut = 0; // Global pitch bend
@@ -344,17 +397,19 @@ class Instance implements SamplerInstance {
 	volLevel = 0; // Global volume
 	volOut = 0; // Effective global volume
 	volRate = 0; // Automatic volume adjustment rate
-	wavDrums: Algorithm[]; // Registered wave drums
-	wavRam: number[] = []; // Wave RAM, decoded from ADPCM
+	wavDrums: Array<Algorithm | null>; // Registered wave drums
+	wavRam: number[] | null = null; // Wave RAM, decoded from ADPCM
 
 	fm2ops: Map<number, Algorithm>; // 2-operator instruments
 	fm4ops: Map<number, Algorithm>; // 4-operator instruments
 
 	//////////////////////////// Constructors /////////////////////////////
 
-	constructor(sampleRate: number) {
+	constructor(sampler: MA3Sampler, sampleRate: number) {
+		this.sampler = sampler;
+
 		// Instance fields
-		this.channels = new Array(10);
+		this.channels = new Array<Channel>(10);
 		this.fm2ops = new Map<number, Algorithm>();
 		this.fm4ops = new Map<number, Algorithm>();
 		this.sampleRate = sampleRate;
@@ -440,7 +495,7 @@ class Instance implements SamplerInstance {
 
 		// Drum algorithm
 		else {
-			if (this.prgWaveDrumType != WAVE_DRUM_NONE) {
+			if (this.sampler.prgWaveDrumType != WAVE_DRUM_NONE) {
 				algorithm = this.getDrumWave(key);
 				isWave = algorithm != null;
 			}
@@ -725,10 +780,10 @@ class Instance implements SamplerInstance {
 		if (key < 0) key += 35;
 
 		// Error checking
-		if (key < 0 || key >= algDrums.length) return null;
+		if (key < 0 || key >= this.sampler.algDrums.length) return null;
 
 		// Select the preset algorithm
-		return algDrums[key];
+		return this.sampler.algDrums[key];
 	}
 
 	// Retrieve an algorithm for playing a wave drum note
@@ -737,7 +792,7 @@ class Instance implements SamplerInstance {
 		if (key < -24) return null;
 
 		// Select the registered wave algorithm, if available
-		let algs: Algorithm[] = algWaveDrums;
+		let algs: Array<Algorithm | null> = this.sampler.algWaveDrums;
 		let ret = null;
 		if (key < 0) {
 			algs = this.wavDrums;
@@ -762,7 +817,8 @@ class Instance implements SamplerInstance {
 		let ret = null;
 
 		// Running in 4-algorithm mode
-		if (prgInstrumentType == FM_MA3_4OP) ret = this.fm4ops.get(hashKey);
+		if (this.sampler.prgInstrumentType == FM_MA3_4OP)
+			ret = this.fm4ops.get(hashKey);
 
 		// Fallback to 2-algorithm mode
 		if (ret == null) ret = this.fm2ops.get(hashKey);
@@ -770,7 +826,7 @@ class Instance implements SamplerInstance {
 		// Fallback to preset
 		if (ret == null) {
 			ret =
-				algInstruments[
+				this.sampler.algInstruments[
 					bank < 2
 						? 0 // Apparent behavior
 						: ((bank & 1) << 6) | (program & 0x3f)
@@ -1444,12 +1500,12 @@ class Operator {
  */
 export class MA3Sampler implements Sampler {
 	// Instance fields
-	private algDrums: Algorithm[] = []; // FM drum algorithms
-	private algInstruments: Algorithm[] = []; // FM instrument algorithms
-	private algWaveDrums: Algorithm[] = []; // Wave drum algorithms
-	private prgDrumType = 0; // FM drum algorithm type
-	private prgInstrumentType = 0; // FM instrument algorithm type
-	private prgWaveDrumType = 0; // Wave drums algorithm type
+	public algDrums: Algorithm[] = []; // FM drum algorithms
+	public algInstruments: Algorithm[] = []; // FM instrument algorithms
+	public algWaveDrums: Algorithm[] = []; // Wave drum algorithms
+	public prgDrumType = 0; // FM drum algorithm type
+	public prgInstrumentType = 0; // FM instrument algorithm type
+	public prgWaveDrumType = 0; // Wave drums algorithm type
 
 	//////////////////////////// Private Constants ////////////////////////////
 
@@ -1474,7 +1530,9 @@ export class MA3Sampler implements Sampler {
 		this.SUSTAINS = new Array<number>(16);
 		this.WAVE_ENV = new Array<number>(512);
 		// WAVES    = new int[32][1024];
-		this.WAVES = Array.from({ length: 32 }, () => new Array(1024).fill(0));
+		this.WAVES = Array.from({ length: 32 }, () =>
+			new Array<number>(1024).fill(0)
+		);
 
 		// Named waves
 		const saw = this.WAVES[24]; // Sawtooth
@@ -1671,7 +1729,7 @@ export class MA3Sampler implements Sampler {
 	public instance(sampleRate: number): SamplerInstance {
 		if (!Number.isFinite(sampleRate) || sampleRate <= 0.0)
 			throw new Error('Invalid sampling rate.');
-		return new Instance(sampleRate);
+		return new Instance(this, sampleRate);
 	}
 
 	/**
@@ -1753,7 +1811,8 @@ export class MA3Sampler implements Sampler {
 	public setWaveDrumType(type: number): number {
 		switch (type) {
 			case WAVE_DRUM_NONE:
-				this.algWaveDrums = null;
+				// TODO: fix this
+				// this.algWaveDrums = null;
 				break;
 			case WAVE_DRUM_MA3:
 				this.algWaveDrums = MA3_DRUMS_WAVE;
@@ -1815,11 +1874,11 @@ export class MA3Sampler implements Sampler {
 
 	// Decode initial wave ROM banks
 	static waveRom(roms: string[]): number[][] {
-		const ret: number[][] = new Array(8);
+		const ret = [];
 
 		for (let x = 0; x < roms.length; x++) {
 			const adpcm = base64decode(roms[x]);
-			ret[x] = this.decodeAICA(adpcm, 0, adpcm.length);
+			ret.push(this.decodeAICA(adpcm, 0, adpcm.length));
 		}
 
 		return ret;
