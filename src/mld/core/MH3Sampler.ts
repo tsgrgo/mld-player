@@ -1,4 +1,83 @@
-import java.util.*;
+import type { Sampler, SamplerInstance } from "./Sampler";
+
+    /**
+     * Specifies the use of MA-2 algorithms for FM synthesis.
+     * @see MA3Sampler(int,int,int)
+     * @see setDrumType
+     * @see setInstrumentType
+     */
+    const FM_MA2 = 2;
+
+    /**
+     * Specifies the use of 2-operator MA-3 algorithms for FM synthesis.
+     * @see MA3Sampler(int,int,int)
+     * @see setDrumType
+     * @see setInstrumentType
+     */
+    const FM_MA3_2OP = 1;
+
+    /**
+     * Specifies the use of 4-operator MA-3 algorithms for FM synthesis.
+     * @see MA3Sampler(int,int,int)
+     * @see setDrumType
+     * @see setInstrumentType
+     */
+    const FM_MA3_4OP = 0;
+
+    /***
+     * Nominal hardware sampling rate. When rendering samples at this rate, the
+     * output will have a 1:1 correspondence with what the hardware would
+     * produce.
+     * @see instance(float)
+     */
+    const SAMPLE_RATE = 33868800.0 / 684;
+
+    /**
+     * Specifies the use of MA-3 waves for wave drum synthesis.
+     * @see MA3Sampler(int,int,int)
+     * @see setWaveDrumType
+     */
+    const WAVE_DRUM_MA3 = 0;
+
+    /**
+     * Specifies that FM drum algorithms always be used in place of wave drums.
+     * @see MA3Sampler(int,int,int)
+     * @see setWaveDrumType
+     */
+    const WAVE_DRUM_NONE = -1;
+
+	
+    // Envelope stages
+    const ENV_ATTACK  = 0;
+    const ENV_DECAY   = 1;
+    const ENV_SUSTAIN = 2;
+    const ENV_RELEASE = 3;
+    const ENV_DONE    = 4;
+
+    // Envelope attenuation parameters by BLOCK and F_NUMBER, used with KSL
+    const KSL_B = [ 0, 2, 1, 4 ];
+    const KSL_F =
+        [ 56, 32, 24, 19, 16, 13, 11, 9, 8, 6, 5, 4, 3, 2, 1, 0 ];
+
+    // Frequency multipliers, doubled to implement with a right shift
+    const MULTIS =
+        [ 1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 20, 24, 24, 30, 30 ];
+
+    // YAMAHA AICA ADPCM quantization step size lookup table
+    const AICA_STEPS =
+        [ 230, 230, 230, 230, 307, 409, 512, 614 ];
+
+    // Amplitude modulation LFO phase-advance
+    const AM_LFO_B = [ 8, 18, 26, 31 ];
+
+    // Formula constants
+    const A4      = 81;         // Key index bias
+    const FULL    =  0;         // Wave maximum
+    const NTS     =  1;
+    const MAGIC_B = 12 / Math.log(2);
+    const MAGIC_F = 684 / 33868800.0;
+    const MINUS   = 0x80000000; // Wave negative
+    const ZERO    = 0x1000;     // Wave minimum
 
 /**
  * Sample generator that mimics YAMAHA MA-3. Supports FM synthesis using MA-2
@@ -10,7 +89,7 @@ import java.util.*;
  *    <tr><th>Scope</th><th>Property</th><th>Default</th></tr>
  *  </thead>
  *  <tbody>
- *    <tr><td>Master</td><td>Fade</td><td>0.0f</td></tr>
+ *    <tr><td>Master</td><td>Fade</td><td>0.0</td></tr>
  *    <tr><td>Master</td><td>Custom FM instruments</td><td>None</td></tr>
  *    <tr><td>Master</td><td>Custom wave drums</td><td>None</td></tr>
  *    <tr><td>Sampler</td><td>Drum type</td>
@@ -24,146 +103,64 @@ import java.util.*;
  * This class only implements the relevant OPL features that it requires, and
  * is not a general-purpose OPL emulator.
  */
-public class MA3Sampler implements Sampler {
+export class MA3Sampler implements Sampler {
 
     // Instance fields
-    private Algorithm[] algDrums;          // FM drum algorithms
-    private Algorithm[] algInstruments;    // FM instrument algorithms
-    private Algorithm[] algWaveDrums;      // Wave drum algorithms
-    private int         prgDrumType;       // FM drum algorithm type
-    private int         prgInstrumentType; // FM instrument algorithm type
-    private int         prgWaveDrumType;   // Wave drums algorithm type
-
-
-
-    //////////////////////////////// Constants ////////////////////////////////
-
-    /**
-     * Specifies the use of MA-2 algorithms for FM synthesis.
-     * @see MA3Sampler(int,int,int)
-     * @see setDrumType
-     * @see setInstrumentType
-     */
-    public static final int FM_MA2 = 2;
-
-    /**
-     * Specifies the use of 2-operator MA-3 algorithms for FM synthesis.
-     * @see MA3Sampler(int,int,int)
-     * @see setDrumType
-     * @see setInstrumentType
-     */
-    public static final int FM_MA3_2OP = 1;
-
-    /**
-     * Specifies the use of 4-operator MA-3 algorithms for FM synthesis.
-     * @see MA3Sampler(int,int,int)
-     * @see setDrumType
-     * @see setInstrumentType
-     */
-    public static final int FM_MA3_4OP = 0;
-
-    /***
-     * Nominal hardware sampling rate. When rendering samples at this rate, the
-     * output will have a 1:1 correspondence with what the hardware would
-     * produce.
-     * @see instance(float)
-     */
-    public static final float SAMPLE_RATE = 33868800.0f / 684;
-
-    /**
-     * Specifies the use of MA-3 waves for wave drum synthesis.
-     * @see MA3Sampler(int,int,int)
-     * @see setWaveDrumType
-     */
-    public static final int WAVE_DRUM_MA3 = 0;
-
-    /**
-     * Specifies that FM drum algorithms always be used in place of wave drums.
-     * @see MA3Sampler(int,int,int)
-     * @see setWaveDrumType
-     */
-    public static final int WAVE_DRUM_NONE = -1;
-
-
+    private algDrums       :Algorithm[] = [];   // FM drum algorithms
+    private algInstruments :Algorithm[] = [];   // FM instrument algorithms
+    private algWaveDrums   :Algorithm[] = [];   // Wave drum algorithms
+    private prgDrumType      = 0; // FM drum algorithm type
+    private prgInstrumentType = 0; // FM instrument algorithm type
+    private prgWaveDrumType  = 0; // Wave drums algorithm type
 
     //////////////////////////// Private Constants ////////////////////////////
 
+	    // Bit flags indicating which FM operators control the final output
+    private static ENV_FLAGS =
+        [ 0b10, 0b11, 0b1111, 0b1000, 0b1000, 0b1010, 0b1001, 0b1101 ];
+
     // Lookup tables
-    private static final int[]   AM_LFO_A; // Amplitude modulation levels
-    private static final int[]   EXP;      // Binary exponent
-    private static final int[]   SUSTAINS; // Sustain levels
-    private static final int[]   WAVE_ENV; // Wave drum envelope levels
-    private static final int[][] WAVES;    // Waveforms
+    private static   AM_LFO_A:number[]; // Amplitude modulation levels
+    private static   EXP     :number[];  // Binary exponent
+    private static   SUSTAINS:number[]; // Sustain levels
+    private static   WAVE_ENV:number[]; // Wave drum envelope levels
+    private static WAVES:number[][];    // Waveforms
 
-    // Envelope stages
-    private static final int ENV_ATTACK  = 0;
-    private static final int ENV_DECAY   = 1;
-    private static final int ENV_SUSTAIN = 2;
-    private static final int ENV_RELEASE = 3;
-    private static final int ENV_DONE    = 4;
-
-    // Envelope attenuation parameters by BLOCK and F_NUMBER, used with KSL
-    private static final int[] KSL_B = { 0, 2, 1, 4 };
-    private static final int[] KSL_F =
-        { 56, 32, 24, 19, 16, 13, 11, 9, 8, 6, 5, 4, 3, 2, 1, 0 };
-
-    // Frequency multipliers, doubled to implement with a right shift
-    private static final int[] MULTIS =
-        { 1, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 20, 24, 24, 30, 30 };
-
-    // YAMAHA AICA ADPCM quantization step size lookup table
-    private static final int[] AICA_STEPS =
-        { 230, 230, 230, 230, 307, 409, 512, 614 };
-
-    // Bit flags indicating which FM operators control the final output
-    private static int[] ENV_FLAGS =
-        { 0b10, 0b11, 0b1111, 0b1000, 0b1000, 0b1010, 0b1001, 0b1101 };
-
-    // Amplitude modulation LFO phase-advance
-    private static final int[] AM_LFO_B = { 8, 18, 26, 31 };
-
-    // Formula constants
-    private static final int    A4      = 81;         // Key index bias
-    private static final int    FULL    =  0;         // Wave maximum
-    private static final int    NTS     =  1;
-    private static final double MAGIC_B = 12 / Math.log(2);
-    private static final double MAGIC_F = 684 / 33868800.0;
-    private static final int    MINUS   = 0x80000000; // Wave negative
-    private static final int    ZERO    = 0x1000;     // Wave minimum
 
     // Compute lookup tables
     // Formulas courtesy of Gambrell and Niemitalo: "OPLx decapsulated"
     static {
 
         // Lookup memory
-        AM_LFO_A = new int[52];
-        EXP      = new int[256];
-        SUSTAINS = new int[16];
-        WAVE_ENV = new int[512];
-        WAVES    = new int[32][1024];
+        this.AM_LFO_A = new Array<number>(52);
+        this.EXP      = new Array<number>(256);
+        this.SUSTAINS = new Array<number>(16);
+        this.WAVE_ENV = new Array<number>(512);
+        // WAVES    = new int[32][1024];
+        this.WAVES = Array.from({ length: 32 }, () => new Array(1024).fill(0));
 
         // Named waves
-        int[] saw = WAVES[24]; // Sawtooth
-        int[] sin = WAVES[ 0]; // Sine
-        int[] tri = WAVES[16]; // Triangle
-        int[] trp = WAVES[ 8]; // Trapezoid (clamped 2*triangle)
+        const saw = this.WAVES[24]; // Sawtooth
+        const sin = this.WAVES[ 0]; // Sine
+        const tri = this.WAVES[16]; // Triangle
+        const trp = this.WAVES[ 8]; // Trapezoid (clamped 2*triangle)
 
         // Quarter-period lookup tables
-        for (int x = 0; x < 256; x++) {
+        for (let x = 0; x < 256; x++) {
 
             // Binary exponent table
-            EXP[x] = 1024 | (int)
+            this.EXP[x] = 1024 | 
                 Math.round((Math.pow(2, (255 - x) / 256.0) - 1 ) * 1024);
 
             // Sine table
-            int y = (int) Math.round(-Math.log(
+            let y =  Math.round(-Math.log(
                 Math.sin((x + 0.5) * Math.PI / 256 / 2)
             ) / Math.log(2) * 256);
             sin[      x] = sin[ 511 - x] = y;
             sin[512 + x] = sin[1023 - x] = y | MINUS;
 
             // Triangle table
-            y = (int) Math.round(-Math.log(
+            y =  Math.round(-Math.log(
                 (x + 0.5) / 256
             ) / Math.log(2) * 256);
             tri[      x] = tri[ 511 - x] = y;
@@ -171,14 +168,14 @@ public class MA3Sampler implements Sampler {
         }
 
         // Trapezoid table
-        for (int x = 0; x < 1024; x++) {
+        for (let x = 0; x < 1024; x++) {
             trp[x] = x < 128 ? tri[x << 1] : x < 256 ? FULL:
                 x < 512 ? trp[511 - x] : trp[1023 - x] | MINUS;
         }
 
         // Sawtooth table
-        for (int x = 0; x < 512; x++) {
-            int y = (int) Math.round(-Math.log(
+        for (let x = 0; x < 512; x++) {
+            let y =  Math.round(-Math.log(
                 (x + 0.5) / 512
             ) / Math.log(2) * 256);
             saw[       x] = y;
@@ -186,58 +183,58 @@ public class MA3Sampler implements Sampler {
         }
 
         // Compute other waveforms
-        for (int x = 0; x < 1024; x++) {
+        for (let x = 0; x < 1024; x++) {
          // WAVES[ 0] is sin
-            WAVES[ 1][x] = x < 512 ? sin[x] : ZERO;
-            WAVES[ 2][x] = sin[x & 511];
-            WAVES[ 3][x] = (x & 511) < 256 ? sin[x & 255] : ZERO;
-            WAVES[ 4][x] = x < 512 ? sin[x << 1] : ZERO;
-            WAVES[ 5][x] = x < 512 ? sin[x << 1 & 511] : ZERO;
-            WAVES[ 6][x] = x < 512 ? FULL : MINUS;
-            WAVES[ 7][x] = x < 512 ? (EXP[255 ^ x >> 1] - 1024) << 1 :
-                WAVES[7][1023 - x] | MINUS;
+            this.WAVES[ 1][x] = x < 512 ? sin[x] : ZERO;
+            this.WAVES[ 2][x] = sin[x & 511];
+            this.WAVES[ 3][x] = (x & 511) < 256 ? sin[x & 255] : ZERO;
+            this.WAVES[ 4][x] = x < 512 ? sin[x << 1] : ZERO;
+            this.WAVES[ 5][x] = x < 512 ? sin[x << 1 & 511] : ZERO;
+            this.WAVES[ 6][x] = x < 512 ? FULL : MINUS;
+            this.WAVES[ 7][x] = x < 512 ? (this.EXP[255 ^ x >> 1] - 1024) << 1 :
+                this.WAVES[7][1023 - x] | MINUS;
          // WAVES[ 8] is trp
-            WAVES[ 9][x] = x < 512 ? trp[x] : ZERO;
-            WAVES[10][x] = trp[x & 511];
-            WAVES[11][x] = (x & 511) < 256 ? trp[x & 255] : ZERO;
-            WAVES[12][x] = x < 512 ? trp[x << 1] : ZERO;
-            WAVES[13][x] = x < 512 ? trp[x << 1 & 511] : ZERO;
-            WAVES[14][x] = x < 512 ? FULL : ZERO;
-            WAVES[15][x] = ZERO; // PCM RAM
+            this.WAVES[ 9][x] = x < 512 ? trp[x] : ZERO;
+            this.WAVES[10][x] = trp[x & 511];
+            this.WAVES[11][x] = (x & 511) < 256 ? trp[x & 255] : ZERO;
+            this.WAVES[12][x] = x < 512 ? trp[x << 1] : ZERO;
+            this.WAVES[13][x] = x < 512 ? trp[x << 1 & 511] : ZERO;
+            this.WAVES[14][x] = x < 512 ? FULL : ZERO;
+            this.WAVES[15][x] = ZERO; // PCM RAM
          // WAVES[16] is tri
-            WAVES[17][x] = x < 512 ? tri[x] : ZERO;
-            WAVES[18][x] = tri[x & 511];
-            WAVES[19][x] = (x & 511) < 256 ? tri[x & 255] : ZERO;
-            WAVES[20][x] = x < 512 ? tri[x << 1] : ZERO;
-            WAVES[21][x] = x < 512 ? tri[x << 1 & 511] : ZERO;
-            WAVES[22][x] = (x & 511) < 256 ? FULL : ZERO;
-            WAVES[23][x] = ZERO; // PCM RAM
+            this.WAVES[17][x] = x < 512 ? tri[x] : ZERO;
+            this.WAVES[18][x] = tri[x & 511];
+            this.WAVES[19][x] = (x & 511) < 256 ? tri[x & 255] : ZERO;
+            this.WAVES[20][x] = x < 512 ? tri[x << 1] : ZERO;
+            this.WAVES[21][x] = x < 512 ? tri[x << 1 & 511] : ZERO;
+            this.WAVES[22][x] = (x & 511) < 256 ? FULL : ZERO;
+            this.WAVES[23][x] = ZERO; // PCM RAM
          // WAVES[24] is saw
-            WAVES[25][x] = x < 512 ? saw[x] : ZERO;
-            WAVES[26][x] = saw[x & 511];
-            WAVES[27][x] = x < 128 ? saw[x] :
+            this.WAVES[25][x] = x < 512 ? saw[x] : ZERO;
+            this.WAVES[26][x] = saw[x & 511];
+            this.WAVES[27][x] = x < 128 ? saw[x] :
                 x >= 512 && x < 768 ? saw[x - 512 << 1] : ZERO;
-            WAVES[28][x] = x < 512 ? saw[x << 1] : ZERO;
-            WAVES[29][x] = x < 512 ? saw[x << 1 & 511] : ZERO;
-            WAVES[30][x] = x < 256 ? FULL : ZERO;
-            WAVES[31][x] = ZERO; // PCM RAM
+            this.WAVES[28][x] = x < 512 ? saw[x << 1] : ZERO;
+            this.WAVES[29][x] = x < 512 ? saw[x << 1 & 511] : ZERO;
+            this.WAVES[30][x] = x < 256 ? FULL : ZERO;
+            this.WAVES[31][x] = ZERO; // PCM RAM
         }
 
         // Compute amplitude modulation LFO
-        for (int x = 0; x < 26; x++)
-            AM_LFO_A[x] = AM_LFO_A[51 - x] = x;
+        for (let x = 0; x < 26; x++)
+            this.AM_LFO_A[x] = this.AM_LFO_A[51 - x] = x;
 
         // Compute sustain levels
-        SUSTAINS[ 0] =   0;
-        SUSTAINS[15] = 511;
-        for (int x = 1; x < 15; x++) {
-            SUSTAINS[x] = (int) Math.round(16 *
+        this.SUSTAINS[ 0] =   0;
+        this.SUSTAINS[15] = 511;
+        for (let x = 1; x < 15; x++) {
+            this.SUSTAINS[x] =  Math.round(16 *
                 Math.pow(2, Math.log(x) / Math.log(2)));
         }
 
         // Compute wave drum envelope levels
-        for (int x = 0; x < 512; x++) {
-            WAVE_ENV[x] = (int) Math.round(32767 *
+        for (let x = 0; x < 512; x++) {
+            this.WAVE_ENV[x] =  Math.round(32767 *
                 Math.pow(10, x * -96.0 / 511 / 20));
         }
 
@@ -269,14 +266,14 @@ public class MA3Sampler implements Sampler {
      * @param waveDrumType Specifies the data source for wave synthesis drum
      * algorithms. Must be either {@code WAVE_DRUM_NONE} or
      * {@code WAVE_DRUM_MA3}.
-     * @exception IllegalArgumentException if the value of
+     * @exception Error if the value of
      * {@code instrumentType}, {@code drumType} or {@code waveDrumType} is
      * invalid.
      * @see setDrumType(int)
      * @see setInstrumentType(int)
      * @see setWaveDrumType(int)
      */
-    public MA3Sampler(int instrumentType, int drumType, int waveDrumType) {
+    public MA3Sampler(instrumentType:number, drumType:number, waveDrumType:number) {
         super();
         algWaveDrums = MA3_DRUMS_WAVE;
         setInstrumentType  (instrumentType);
@@ -295,8 +292,8 @@ public class MA3Sampler implements Sampler {
      * {@code FM_MA3_2OP} or {@code FM_MA3_4OP}.
      * @see setDrumType(int)
      */
-    public int getDrumType() {
-        return prgDrumType;
+    public getDrumType():number {
+        return this.prgDrumType;
     }
 
     /**
@@ -306,8 +303,8 @@ public class MA3Sampler implements Sampler {
      * {@code FM_MA2}, {@code FM_MA3_2OP} or {@code FM_MA3_4OP}.
      * @see setInstrumentType(int)
      */
-    public int getInstrumentType() {
-        return prgInstrumentType;
+    public getInstrumentType():number {
+        return this.prgInstrumentType;
     }
 
     /**
@@ -317,8 +314,8 @@ public class MA3Sampler implements Sampler {
      * {@code WAVE_DRUM_NONE} or {@code WAVE_DRUM_MA3}.
      * @see setWaveDrumType(int)
      */
-    public int getWaveDrumType() {
-        return prgWaveDrumType;
+    public getWaveDrumType():number {
+        return this.prgWaveDrumType;
     }
 
     /**
@@ -329,13 +326,13 @@ public class MA3Sampler implements Sampler {
      * @param sampleRate The output sampling rate of the rendered samples.
      * @return A new sampler instance that can render samples using the current
      * configuration of this sampler itself.
-     * @exception IllegalArgumentException if {@code sampleRate} is a
+     * @exception Error if {@code sampleRate} is a
      * non-number or is less than or equal to zero.
      */
-    public Sampler.Instance instance(float sampleRate) {
-        if (!Float.isFinite(sampleRate) || sampleRate <= 0.0f)
-            throw new IllegalArgumentException("Invalid sampling rate.");
-        return new Instance(sampleRate);
+    public instance(sampleRate:number):  SamplerInstance  {
+        if (!Number.isFinite(sampleRate) || sampleRate <= 0.0)
+            throw new Error("Invalid sampling rate.");
+        return new MA3Sampler.Instance(sampleRate);
     }
 
     /**
@@ -345,21 +342,21 @@ public class MA3Sampler implements Sampler {
      * @param type Specifies the data source for FM drum algorithms. Must be
      * one of {@code FM_MA2}, {@code FM_MA3_2OP} or {@code FM_MA3_4OP}.
      * @return The value of {@code type}.
-     * @exception IllegalArgumentException if the value of {@code type} is
+     * @exception Error if the value of {@code type} is
      * invalid.
      * @see getDrumType()
      * @see setInstrumentType(int)
      * @see setWaveDrumType(int)
      */
-    public int setDrumType(int type) {
+    public setDrumType(type:number): number {
         switch (type) {
-            case FM_MA2    : algDrums = MA2_DRUMS    ; break;
-            case FM_MA3_2OP: algDrums = MA3_DRUMS_2OP; break;
-            case FM_MA3_4OP: algDrums = MA3_DRUMS_4OP; break;
+            case FM_MA2    : this.algDrums = MA3Sampler.MA2_DRUMS    ; break;
+            case FM_MA3_2OP: this.algDrums = MA3Sampler.MA3_DRUMS_2OP; break;
+            case FM_MA3_4OP: this.algDrums = MA3Sampler.MA3_DRUMS_4OP; break;
             default:
-                throw new IllegalArgumentException("Invalid type.");
+                throw new Error("Invalid type.");
         }
-        return prgDrumType = type;
+        return this.prgDrumType = type;
     }
 
     /**
@@ -371,21 +368,21 @@ public class MA3Sampler implements Sampler {
      * be one of {@code FM_MA2}, {@code FM_MA3_2OP} or
      * {@code FM_MA3_4OP}.
      * @return The value of {@code type}.
-     * @exception IllegalArgumentException if the value of {@code type} is
+     * @exception Error if the value of {@code type} is
      * invalid.
      * @see getInstrumentType()
      * @see setDrumType(int)
      * @see setWaveDrumType(int)
      */
-    public int setInstrumentType(int type) {
+    public setInstrumentType(type:number):number {
         switch (type) {
-            case FM_MA2    : algInstruments = MA2_INSTRUMENTS    ; break;
-            case FM_MA3_2OP: algInstruments = MA3_INSTRUMENTS_2OP; break;
-            case FM_MA3_4OP: algInstruments = MA3_INSTRUMENTS_4OP; break;
+            case FM_MA2    : this.algInstruments = MA3Sampler.MA2_INSTRUMENTS    ; break;
+            case FM_MA3_2OP: this.algInstruments = MA3Sampler.MA3_INSTRUMENTS_2OP; break;
+            case FM_MA3_4OP: this.algInstruments = MA3Sampler.MA3_INSTRUMENTS_4OP; break;
             default:
-                throw new IllegalArgumentException("Invalid type.");
+                throw new Error("Invalid type.");
         }
-        return prgInstrumentType = type;
+        return this.prgInstrumentType = type;
     }
 
     /**
@@ -396,20 +393,20 @@ public class MA3Sampler implements Sampler {
      * @param type Specifies the data source for wave drum algorithms. Must be
      * either {@code WAVE_DRUM_NONE} or {@code WAVE_DRUM_MA3}.
      * @return The value of {@code type}.
-     * @exception IllegalArgumentException if the value of {@code type} is
+     * @exception Error if the value of {@code type} is
      * invalid.
      * @see getWaveDrumType()
      * @see setDrumType(int)
      * @see setInstrumentType(int)
      */
-    public int setWaveDrumType(int type) {
+    public setWaveDrumType( type:number):number {
         switch (type) {
-            case WAVE_DRUM_NONE: algWaveDrums = null          ; break;
-            case WAVE_DRUM_MA3 : algWaveDrums = MA3_DRUMS_WAVE; break;
+            case WAVE_DRUM_NONE: this.algWaveDrums = null          ; break;
+            case WAVE_DRUM_MA3 : this.algWaveDrums = MA3Sampler.MA3_DRUMS_WAVE; break;
             default:
-                throw new IllegalArgumentException("Invalid type.");
+                throw new Error("Invalid type.");
         }
-        return prgWaveDrumType = type;
+        return this.prgWaveDrumType = type;
     }
 
 
@@ -417,17 +414,17 @@ public class MA3Sampler implements Sampler {
     ///////////////////////////// Private Methods /////////////////////////////
 
     // Decode ADPCM samples encoded as YAMAHA AICA
-    static int[] decodeAICA(byte[] adpcm, int offset, int length) {
-        int[] ret = new int[length * 2];
-        int   An  = 127; // Quantization step size
-        int   Xn  =   0; // Predictor
+    static decodeAICA( adpcm:Uint8Array,  offset:number, length:number):number[] {
+        const ret = new Array<number>(length * 2);
+        let   An  = 127; // Quantization step size
+        let   Xn  =   0; // Predictor
 
         // Process all ADPCM bytes
-        for (int src = offset, dest = 0; src < offset + length; src++) {
-            int bits = adpcm[src] & 0xFF;
+        for (let src = offset, dest = 0; src < offset + length; src++) {
+            let bits = adpcm[src] & 0xFF;
 
             // Process both nibbles
-            for (int n = 0; n < 2; n++, bits >>= 4, dest++) {
+            for (let n = 0; n < 2; n++, bits >>= 4, dest++) {
 
                 // Compute the next output sample
                 ret[dest] = Xn = Math.min(Math.max(
@@ -450,65 +447,82 @@ public class MA3Sampler implements Sampler {
         return ret;
     }
 
+	static base64decode(b64: string): Uint8Array {
+		const clean = b64.replace(/\s+/g, "");
+		const bin = atob(clean);
+		const bytes = new Uint8Array(bin.length);
+		for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i) & 0xff;
+		return bytes;
+	}
+
     // Decode initial wave ROM banks
-    static int[][] waveRom(String[] roms) {
-        Base64.Decoder base64 = Base64.getMimeDecoder();
-        int[][]        ret    = new int[8][];
-        for (int x = 0; x < roms.length; x++) {
-            byte[] adpcm = base64.decode(roms[x]);
-            ret[x]       = decodeAICA(adpcm, 0, adpcm.length);
+    static waveRom(roms:string[]):number[][] {
+		const ret: number[][] = new Array(8);
+
+        for (let x = 0; x < roms.length; x++) {
+            const adpcm = this.base64decode(roms[x]);
+            ret[x]       = this.decodeAICA(adpcm, 0, adpcm.length);
         }
+
         return ret;
     }
+
+	create2DArray<T>(
+  rows: number = 32,
+  cols: number = 1024,
+  initialValue: T
+): T[][] {
+  return Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => initialValue)
+  );
+}
 
 
 
     //////////////////////////////// Algorithm ////////////////////////////////
 
     // Template algorithm for OPL synthesis
-    private static class Algorithm {
+    private static Algorithm = class {
 
         // Instance fields
-        int        alg;        // Operator connection algorithm
-        int        drumKey;    // Key played for drum notes
-        int        ep;         // Wave end point
-        float      freqBase;   // Drum frequency base
-        int        fs;         // Wave sampling frequency
-        boolean    isDrum;     // Is a drum note
-        boolean    isForever;  // Envelopes never fully decay
-        boolean    isWave;     // Is a wave rum algorithm
-        int        lfo;        // Modulation LFO rate multiplier
-        int        lp;         // Wave loop point
-        Operator[] operators;  // FM operator templates
-        int        panpot;     // Stereo balance
-        boolean    pe;         // Unknown significance
-        boolean    rm;         // Wave ROM select
-        float      volLeft;    // Left stereo amplitude
-        float      volRight;   // Right stereo amplitude
-        float      wavAdvance; // Wave samples to advance per output sample
-        int        waveId;     // Wave ROM index
+        alg=0;        // Operator connection algorithm
+        drumKey=0;    // Key played for drum notes
+        ep=0;         // Wave end point
+        freqBase=0;   // Drum frequency base
+        fs=0;         // Wave sampling frequency
+        isDrum = false;     // Is a drum note
+        isForever = false;  // Envelopes never fully decay
+        isWave = false;     // Is a wave rum algorithm
+        lfo=0;        // Modulation LFO rate multiplier
+        lp=0;         // Wave loop point
+        operators: Operator[];  // FM operator templates
+        panpot=0;     // Stereo balance
+        pe = false;         // Unknown significance
+        rm = false;         // Wave ROM select
+        volLeft = 0;    // Left stereo amplitude
+        volRight = 0;   // Right stereo amplitude
+        wavAdvance = 0; // Wave samples to advance per output sample
+        waveId = 0;     // Wave ROM index
 
 
 
         /////////////////////////// Static Methods ////////////////////////////
 
-        private static Algorithm[] from(String[] defs,
-            boolean isDrum, boolean isWave) {
-            Base64.Decoder base64 = Base64.getMimeDecoder();
-            Algorithm[]    ret    = null;
+        private static from(defs:string[], isDrum:boolean,  isWave:boolean): Algorithm[] {
+            let ret: Algorithm[];
 
             // FM presets
             if (!isWave) {
-                ret = new Algorithm[defs.length];
-                for (int x = 0; x < defs.length; x++)
-                    ret[x] = new Algorithm(base64.decode(defs[x]), isDrum);
+                ret = new Array<Algorithm>(defs.length);
+                for (let x = 0; x < defs.length; x++)
+                    ret[x] = new MA3Sampler.Algorithm(MA3Sampler.base64decode(defs[x]), isDrum);
             }
 
             // Wave drum presets
             else {
-                ret = new Algorithm[61];
-                for (int x = 0; x < defs.length; x++) {
-                    Algorithm alg = new Algorithm(base64.decode(defs[x]), 0);
+                ret = new Array<Algorithm>(61);
+                for (let x = 0; x < defs.length; x++) {
+                    const alg = new MA3Sampler.Algorithm(MA3Sampler.base64decode(defs[x]), 0);
                     ret[alg.drumKey - 24] = alg;
                 }
             }
@@ -521,74 +535,74 @@ public class MA3Sampler implements Sampler {
         //////////////////////////// Constructors /////////////////////////////
 
         // FM constructor
-        private Algorithm(byte[] bytes, boolean isDrum) {
+        private Algorithm1( bytes:Uint8Array,  isDrum:boolean) {
 
             // Decode bits
-            lfo     = bytes[0]      &   3;
-            panpot  = bytes[1] >> 3 &  31;
-            alg     = bytes[1]      &   7;
-            drumKey = bytes[2]      & 127;
+            this.lfo     = bytes[0]      &   3;
+            this.panpot  = bytes[1] >> 3 &  31;
+            this.alg     = bytes[1]      &   7;
+            this.drumKey = bytes[2]      & 127;
 
             // Operators
-            operators = new Operator[alg < 2 ? 2 : 4];
-            for (int x = 0; x < operators.length; x++)
-                operators[x] = new Operator(bytes, 3 + x * 7);
+            this.operators = new Array<MA3Sampler.Operator>(this.alg < 2 ? 2 : 4);
+            for (let x = 0; x < this.operators.length; x++)
+                this.operators[x] = new MA3Sampler.Operator(bytes, 3 + x * 7);
 
             // Instance fields
-            freqBase    = (float) (440 * Math.pow(2, (drumKey - 69) / 12.0));
+            this.freqBase    =  (440 * Math.pow(2, (this.drumKey - 69) / 12.0));
             this.isDrum = isDrum;
-            isWave      = false;
-            initPost();
+            this.isWave      = false;
+            this.initPost();
         }
 
         // Wave drum constructor
-        private Algorithm(byte[] message, int offset) {
-            int bits; // Scratch
+        private Algorithm2( message:Uint8Array, offset:number) {
+            let bits; // Scratch
 
             // Parse fields
-            drumKey = message[offset++] & 0xFF;
-            fs      = (message[offset]&0xFF) << 8 | message[offset + 1]&0xFF;
+            this.drumKey = message[offset++] & 0xFF;
+            this.fs      = (message[offset]&0xFF) << 8 | message[offset + 1]&0xFF;
             offset += 2;
             bits    = message[offset++] & 0xFF;
-            panpot  = bits >> 3 & 31;
-            pe      =(bits      &  1) != 0;
+            this.panpot  = bits >> 3 & 31;
+            this.pe      =(bits      &  1) != 0;
             bits    = message[offset++] & 0xFF;
-            lfo     = bits >> 6 & 3;
+            this.lfo     = bits >> 6 & 3;
             // pcm  = bits >> 1 & 1;
-            operators = new Operator[] { new Operator(offset, message) };
+            this.operators = [new MA3Sampler.Operator(offset, message)];
             offset += 7; // 5 for operator, 2 unknown (always zero?)
-            lp      = (message[offset]&0xFF) << 8 | message[offset + 1]&0xFF;
+            this.lp      = (message[offset]&0xFF) << 8 | message[offset + 1]&0xFF;
             offset += 2;
-            ep      = (message[offset]&0xFF) << 8 | message[offset + 1]&0xFF;
+            this.ep      = (message[offset]&0xFF) << 8 | message[offset + 1]&0xFF;
             offset += 2;
             bits    = message[offset++] & 0xFF;
-            rm      =(bits >> 7 & 1) != 0;
-            waveId  = bits & 7;
+            this.rm      =(bits >> 7 & 1) != 0;
+            this.waveId  = bits & 7;
 
             // Instance fields
-            isDrum     = true;
-            isWave     = true;
-            wavAdvance = fs / SAMPLE_RATE;
-            initPost();
+            this.isDrum     = true;
+            this.isWave     = true;
+            this.wavAdvance = this.fs / SAMPLE_RATE;
+            this.initPost();
         }
 
         // FM SysEx constructor
-        private Algorithm(int offset, byte[] message) {
-            int bits;
-            int type = message[offset  ] & 0xFF;
+        private Algorithm3(offset:number, message:Uint8Array) {
+            let bits;
+            let type = message[offset  ] & 0xFF;
             offset  += 4;
             bits     = message[offset++] & 0xFF;
-            panpot   = bits >> 3 & 31;
+            this.panpot   = bits >> 3 & 31;
             bits     = message[offset++] & 0xFF;
-            lfo      = bits >> 6 &  3;
-            pe       =(bits >> 5 &  1) != 0;
-            alg      = bits      &  7;
-            if (alg > 1 && type == 0x01)
-                throw new RuntimeException("Operator count mismatch");
-            operators = new Operator[alg < 2 ? 2 : 4];
-            for (int x = 0; x < operators.length; x++, offset += 7)
-                operators[x] = new Operator(message, offset, true);
-            initPost();
+            this.lfo      = bits >> 6 &  3;
+            this.pe       =(bits >> 5 &  1) != 0;
+            this.alg      = bits      &  7;
+            if (this.alg > 1 && type == 0x01)
+                throw new Error("Operator count mismatch");
+            this.operators = new Array<MA3Sampler.Operator>(this.alg < 2 ? 2 : 4);
+            for (let x = 0; x < this.operators.length; x++, offset += 7)
+                this.operators[x] = new MA3Sampler.Operator(message, offset, true);
+            this.initPost();
         }
 
 
@@ -596,25 +610,25 @@ public class MA3Sampler implements Sampler {
         /////////////////////////// Private Methods ///////////////////////////
 
         // Initialize settings after decoding parameters
-        private void initPost() {
+        private initPost():void {
 
             // Test whether the envelopes fully decay
-            if (!isWave /*|| lp < ep*/) {
-                int flags = isWave ? 1 : ENV_FLAGS[alg];
+            if (!this.isWave /*|| lp < ep*/) {
+                let flags = this.isWave ? 1 : MA3Sampler.ENV_FLAGS[this.alg];
                 for (
-                    int x = 0;
-                    !isForever && x < operators.length;
+                    let x = 0;
+                    !this.isForever && x < this.operators.length;
                     x++, flags >>= 1
                 ) {
-                    Operator op = operators[x];
-                    isForever   = (flags & 1) != 0 &&
+                    const op = this.operators[x];
+                    this.isForever   = (flags & 1) != 0 &&
                         (op.xof ? op.sr==0 || op.dr==0 && op.sr!=0 : op.rr==0);
                 }
             }
 
             // Volume levels
-            volRight = panpot / (panpot <= 15 ? 30.0f : 31.0f);
-            volLeft  = 1 - volRight;
+            this.volRight = this.panpot / (this.panpot <= 15 ? 30.0 : 31.0);
+            this.volLeft  = 1 - this.volRight;
         }
 
     }
@@ -624,35 +638,35 @@ public class MA3Sampler implements Sampler {
     ///////////////////////////////// Channel /////////////////////////////////
 
     // Output channel
-    private class Channel {
+	
+    private static Channel = class {
 
         // Instance fields
-        float           bendBase;    // Pitch bend base ratio
-        float           bendOut;     // Effective channel frequency ratio
-        float           bendRange;   // Pitch bend magnitude
-        int             index;       // Index in sampler
-        Instance        instance;    // Encapsulating instance
-        boolean         isDrum;      // The channel plays drum notes
-        Note[]          notesOn;     // All notes currently on keys
-        ArrayList<Note> notesOut;    // All notes that are generating output
-        int             prgBank;     // Program bank
-        int             prgProgram;  // Program index in bank
-        float           volLeft;     // Left stereo amplitude
-        float           volLeftOut;  // Left stereo output amplitude
-        float           volLevel;    // Channel output amplitude
-        float           volPanning;  // Stereo level
-        float           volRight;    // Right stereo amplitude
-        float           volRightOut; // Right stereo output amplitude
-
+        bendBase= 0;    // Pitch bend base ratio
+        bendOut=0;     // Effective channel frequency ratio
+        bendRange=0;   // Pitch bend magnitude
+        index=0;       // Index in sampler
+        instance: Instance;    // Encapsulating instance
+        isDrum = false;      // The channel plays drum notes
+        notesOn: Note[];     // All notes currently on keys
+        notesOut: Note[];    // All notes that are generating output
+        prgBank = 0;     // Program bank
+        prgProgram=0;  // Program index in bank
+        volLeft=0;     // Left stereo amplitude
+        volLeftOut=0;  // Left stereo output amplitude
+        volLevel=0;    // Channel output amplitude
+        volPanning=0;  // Stereo level
+        volRight=0;    // Right stereo amplitude
+        volRightOut=0; // Right stereo output amplitude
 
 
         //////////////////////////// Constructors /////////////////////////////
 
-        Channel(Instance instance, int index) {
+        constructor(instance: Instance,  index:number) {
             this.index    = index;
             this.instance = instance;
-            notesOn       = new Note[128]; // C-2 .. G8
-            notesOut      = new ArrayList<Note>();
+            this.notesOn       = new Array<Note>(128); // C-2 .. G8
+            this.notesOut      = [];
         }
 
 
@@ -660,49 +674,49 @@ public class MA3Sampler implements Sampler {
         /////////////////////////// Private Methods ///////////////////////////
 
         // Frequency has changed
-        private void onFrequency() {
-            float bend = instance.bendOut * bendOut;
-            for (Note note : notesOut)
-                note.onFrequency(bendOut);
+        private  onFrequency() : void{
+            const bend = this.instance.bendOut * this.bendOut;
+            for (const note of this.notesOut)
+                note.onFrequency(this.bendOut);
         }
 
         // Volume has changed
-        private void onVolume() {
-            volLeftOut  = instance.volOut * volLeft;
-            volRightOut = instance.volOut * volRight;
-            for (Note note : notesOut)
+        private  onVolume() : void{
+            this.volLeftOut  = this.instance.volOut * this.volLeft;
+            this.volRightOut = this.instance.volOut * this.volRight;
+            for (const note of this.notesOut)
                 note.onVolume();
         }
 
         // Render the next input sample
-        private void render() {
-            for (int x = 0; x < notesOut.size(); x++) {
-                if (notesOut.get(x).render())
-                    notesOut.remove(x--);
+        private  render(): void {
+            for (let x = 0; x < this.notesOut.length; x++) {
+                if (this.notesOut[x].render())
+                    this.notesOut.splice(x--, 1);
             }
         }
 
         // Initialize state
-        private void reset() {
+        private  reset(): void {
 
             // Instance fields
-            bendBase    = 0.0f;
-            bendOut     = 1.0f;
-            bendRange   = 2.0f;
-            isDrum      = false;
-            prgBank     = 0;
-            prgProgram  = 0;
-            volLevel    = 1.0f;
-            volPanning  = 0.5f;
-            volLeft     = 0.5f;
-            volLeftOut  = 0.5f;
-            volRight    = 0.5f;
-            volRightOut = 0.5f;
+            this.bendBase    = 0.0;
+            this.bendOut     = 1.0;
+            this.bendRange   = 2.0;
+            this.isDrum      = false;
+            this.prgBank     = 0;
+            this.prgProgram  = 0;
+            this.volLevel    = 1.0;
+            this.volPanning  = 0.5;
+            this.volLeft     = 0.5;
+            this.volLeftOut  = 0.5;
+            this.volRight    = 0.5;
+            this.volRightOut = 0.5;
 
             // Stop playing all notes (not calling note.onFrequency())
-            for (int x = 0; x < notesOn.length; x++)
-                notesOn[x] = null;
-            for (Note note : notesOut)
+            for (let x = 0; x < this.notesOn.length; x++)
+                this.notesOn[x] = null;
+            for (const note of this.notesOut)
                 note.stop();
         }
 
@@ -711,50 +725,52 @@ public class MA3Sampler implements Sampler {
 
 
     //////////////////////////////// Instance /////////////////////////////////
-     class Instance implements Sampler.Instance {
+	
+    private static Instance = class implements SamplerInstance {
 
         // Instance fields
-        int         amPhase;     // Amplitude modulator phase
-        float       bendOut;     // Global pitch bend
-        Channel[]   channels;    // Channel states
-        float       sampleRate;  // Output sampling rate
-        float[]     smpNext;     // Next input sample
-        float       smpPosition; // Position between input samples
-        float[]     smpPrev;     // Previous input sample
-        float       smpWidth;    // Number of input samples per output sample
-        int         vibPhase;    // Frequency modulator phase
-        float       volFade;     // Global attenuation
-        float       volLevel;    // Global volume
-        float       volOut;      // Effective global volume
-        float       volRate;     // Automatic volume adjustment rate
-        Algorithm[] wavDrums;    // Registered wave drums
-        int[]       wavRam;      // Wave RAM, decoded from ADPCM
-        HashMap<Integer, Algorithm> fm2ops; // 2-operator instruments
-        HashMap<Integer, Algorithm> fm4ops; // 4-operator instruments
+        amPhase = 0;     // Amplitude modulator phase
+        bendOut = 0;     // Global pitch bend
+        channels: MA3Sampler.Channel[];    // Channel states
+        sampleRate= 0;  // Output sampling rate
+        smpNext: number[];     // Next input sample
+        smpPosition = 0; // Position between input samples
+        smpPrev: number[];     // Previous input sample
+        smpWidth = 0;    // Number of input samples per output sample
+        vibPhase = 0;    // Frequency modulator phase
+        volFade = 0;     // Global attenuation
+        volLevel = 0;    // Global volume
+        volOut = 0;      // Effective global volume
+        volRate = 0;     // Automatic volume adjustment rate
+        wavDrums: Algorithm[];    // Registered wave drums
+        wavRam: number[];      // Wave RAM, decoded from ADPCM
+
+		fm2ops: Map<number, Algorithm>; // 2-operator instruments
+        fm4ops: Map<number, Algorithm>; // 4-operator instruments
 
 
 
         //////////////////////////// Constructors /////////////////////////////
 
-        Instance(float sampleRate) {
+        constructor( sampleRate:number) {
 
             // Instance fields
-            channels        = new Channel[10];
-            fm2ops          = new HashMap<Integer, Algorithm>();
-            fm4ops          = new HashMap<Integer, Algorithm>();
+            this.channels        = new Array(10);
+            this.fm2ops          = new Map<number, Algorithm>();
+            this.fm4ops          = new Map<number, Algorithm>();
             this.sampleRate = sampleRate;
-            smpNext         = new float[2];
-            smpPrev         = new float[2];
-            smpWidth        = SAMPLE_RATE / sampleRate;
-            volRate         = 1 / (sampleRate * 0.01f);
-            wavDrums        = new Algorithm[128];
+            this.smpNext         = new Array<number>(2);
+            this.smpPrev         = new Array<number>(2);
+            this.smpWidth        = SAMPLE_RATE / sampleRate;
+            this.volRate         = 1 / (sampleRate * 0.01);
+            this.wavDrums        = new Array<Algorithm>(128);
 
             // Channels
-            for (int x = 0; x < channels.length; x++)
-                channels[x] = new Channel(this, x);
+            for (let x = 0; x < this.channels.length; x++)
+                this.channels[x] = new MA3Sampler.Channel(this, x);
 
             // Initialize state
-            reset();
+            this.reset();
         }
 
 
@@ -762,75 +778,75 @@ public class MA3Sampler implements Sampler {
         /////////////////////////// Public Methods ////////////////////////////
 
         // Specify a channel's program bank.
-        public void bankChange(int channel, int bank) {
-            if (channel < 0 || channel >= channels.length)
+        public bankChange(channel:number, bank:number): void {
+            if (channel < 0 || channel >= this.channels.length)
                 return;
-            Channel chan = channels[channel];
+            const chan = this.channels[channel];
             chan.prgBank = bank;
         }
 
         // Specify whether a channel should play drum notes.
-        public void drumEnable(int channel, boolean enable) {
-            if (channel < 0 || channel >= channels.length)
+        public drumEnable(channel:number, enable:boolean) : void{
+            if (channel < 0 || channel >= this.channels.length)
                 return;
-            Channel chan = channels[channel];
+            const chan = this.channels[channel];
             chan.isDrum  = enable;
         }
 
         // Determine whether or not any notes are producing output.
-        public boolean isFinished() {
-            for (Channel chan : channels) {
-                if (chan.notesOut.size() != 0)
+        public  isFinished() : boolean{
+            for (const chan of this.channels) {
+                if (chan.notesOut.length != 0)
                     return false;
             }
             return true;
         }
 
         // Deactivate a key that has previoulsy been activated on a channel.
-        public void keyOff(int channel, int key) {
+        public  keyOff( channel:number, key:number): void {
             if (
-                channel  < 0 || channel  >= channels.length ||
+                channel  < 0 || channel  >= this.channels.length ||
                 A4 + key < 0 || A4 + key >= 128
             ) return;
-            Channel chan = channels[channel];
-            Note    note = chan.notesOn[A4 + key];
+            const chan = this.channels[channel];
+            const    note = chan.notesOn[A4 + key];
             if (note != null)
                 note.off();
             chan.notesOn[A4 + key] = null;
         }
 
         // Activate a key on a channel.
-        public void keyOn(int channel, int key, float velocity) {
+        public  keyOn( channel:number,  key:number,  velocity:number) : void{
 
             // Error checking
-            if (!Float.isFinite(velocity) || velocity < 0.0f)
-                throw new IllegalArgumentException("Invalid velocity.");
+            if (!Number.isFinite(velocity) || velocity < 0.0)
+                throw new Error("Invalid velocity.");
             if (
-                channel  < 0 || channel  >= channels.length ||
+                channel  < 0 || channel  >= this.channels.length ||
                 A4 + key < 0 || A4 + key >= 128
             ) return;
 
             // Working variables
-            Algorithm algorithm = null;
-            Channel   chan      = channels[channel];
-            float     freqBase  = 0;
-            boolean   isWave    = false;
-            Note      note      = chan.notesOn[A4 + key];
+            let algorithm = null;
+            let   chan      = this.channels[channel];
+            let freqBase  = 0;
+            let isWave    = false;
+            let note      = chan.notesOn[A4 + key];
 
             // FM instrument algorithm
             if (!chan.isDrum) {
-                algorithm = getFMInstrument(chan.prgBank, chan.prgProgram);
-                freqBase  = (float) (440 * Math.pow(2, key / 12.0));
+                algorithm = this.getFMInstrument(chan.prgBank, chan.prgProgram);
+                freqBase  =  (440 * Math.pow(2, key / 12.0));
             }
 
             // Drum algorithm
             else {
-                if (prgWaveDrumType != WAVE_DRUM_NONE) {
-                    algorithm = getDrumWave(key);
+                if (this.prgWaveDrumType != WAVE_DRUM_NONE) {
+                    algorithm = this.getDrumWave(key);
                     isWave    = algorithm != null;
                 }
                 if (algorithm == null)
-                    algorithm = getDrumFM(key);
+                    algorithm = this.getDrumFM(key);
                 if (algorithm == null)
                     return;
                 freqBase = algorithm.freqBase;
@@ -839,7 +855,7 @@ public class MA3Sampler implements Sampler {
 
             // Stop the previous note if necessary
             if (note != null && (chan.isDrum || note.algorithm != algorithm)) {
-                keyOff(channel, key);
+                this.keyOff(channel, key);
                 note = null;
             }
 
@@ -855,158 +871,141 @@ public class MA3Sampler implements Sampler {
             note.onVolume();
             if (!isWave) {
                 note.freqBase = freqBase;
-                note.onFrequency(bendOut * chan.bendOut);
+                note.onFrequency(this.bendOut * chan.bendOut);
             }
 
         }
 
         // Specify the global pitch bend.
-        public void masterTune(float semitones) {
-            if (!Float.isFinite(semitones))
-                throw new IllegalArgumentException("Invalid semitones.");
-            bendOut = (float) Math.pow(2, semitones);
-            for (Channel chan : channels)
+        public  masterTune( semitones:number) : void{
+            if (!Number.isFinite(semitones))
+                throw new Error("Invalid semitones.");
+            this.bendOut = Math.pow(2, semitones);
+            for (const chan of this.channels)
                 chan.onFrequency();
         }
 
         // Specify the global volume.
-        public void masterVolume(float volume) {
-            if (!Float.isFinite(volume) || volume < 0.0f)
-                throw new IllegalArgumentException("Invalid volume.");
-            volLevel = volume;
-            onVolume();
+        public  masterVolume( volume:number): void {
+            if (!Number.isFinite(volume) || volume < 0.0)
+                throw new Error("Invalid volume.");
+            this.volLevel = volume;
+            this.onVolume();
         }
 
         // Specify stereo panning on a channel.
-        public void panpot(int channel, float panpot) {
-            if (!Float.isFinite(panpot) || panpot < -1.0f || panpot > 1.0f)
-                throw new IllegalArgumentException("Invalid panpot.");
-            if (channel < 0 || channel >= channels.length)
+        public  panpot(channel:number, panpot:number): void {
+            if (!Number.isFinite(panpot) || panpot < -1.0 || panpot > 1.0)
+                throw new Error("Invalid panpot.");
+            if (channel < 0 || channel >= this.channels.length)
                 return;
-            Channel chan    = channels[channel];
+            const chan    = this.channels[channel];
             chan.volPanning = (panpot + 1) / 2;
-            chan.volLeft    = (1.0f - chan.volPanning) * chan.volLevel;
+            chan.volLeft    = (1.0 - chan.volPanning) * chan.volLevel;
             chan.volRight   =         chan.volPanning  * chan.volLevel;
             chan.onVolume();
         }
 
         // Specify a channel's pitch bend.
-        public void pitchBend(int channel, float semitones) {
-            if (!Float.isFinite(semitones))
-                throw new IllegalArgumentException("Invalid semitones.");
-            if (channel < 0 || channel >= channels.length)
+        public  pitchBend(channel:number, semitones:number) : void{
+            if (!Number.isFinite(semitones))
+                throw new Error("Invalid semitones.");
+            if (channel < 0 || channel >= this.channels.length)
                 return;
-            Channel chan  = channels[channel];
+            const chan  = this.channels[channel];
             chan.bendBase = semitones;
-            chan.bendOut  = (float) Math.pow(2, chan.bendBase*chan.bendRange);
+            chan.bendOut  =  Math.pow(2, chan.bendBase*chan.bendRange);
             chan.onFrequency();
         }
 
         // Specify the range of a channel's pitch bend.
-        public void pitchBendRange(int channel, float range) {
-            if (!Float.isFinite(range) || range < 0.0f)
-                throw new IllegalArgumentException("Invalid range.");
-            if (channel < 0 || channel >= channels.length)
+        public  pitchBendRange( channel:number,  range:number): void {
+            if (!Number.isFinite(range) || range < 0.0)
+                throw new Error("Invalid range.");
+            if (channel < 0 || channel >= this.channels.length)
                 return;
-            Channel chan   = channels[channel];
+            const chan   = this.channels[channel];
             chan.bendRange = range;
-            chan.bendOut   = (float) Math.pow(2, chan.bendBase*chan.bendRange);
+            chan.bendOut   =  Math.pow(2, chan.bendBase*chan.bendRange);
             chan.onFrequency();
         }
 
         // Speicfy a channel's program number.
-        public void programChange(int channel, int program) {
-            Channel chan    = channels[channel];
+        public  programChange( channel:number,  program:number) : void{
+            const chan    = this.channels[channel];
             chan.prgProgram = program;
         }
 
         // Generate output samples.
-        public void render(float[] samples, int offset, int frames) {
-            render(samples, offset, frames, 1.0f, 1.0f, true, true);
-        }
-
-        // Generate output samples.
-        public void render(float[] samples, int offset, int frames,
-            float amplitude) {
-            render(samples, offset, frames, amplitude, amplitude, true, true);
-        }
-
-        // Generate output samples.
-        public void render(float[] samples, int offset, int frames,
-            float left, float right) {
-            render(samples, offset, frames, left, right, true, true);
-        }
-
-        // Generate output samples.
-        public void render(float[] samples, int offset, int frames,
-            float left, float right, boolean erase, boolean clamp) {
+        public  render( samples: Float32Array, offset:number,  frames:number,
+             left=1,  right= 1,  erase = true, clamp = true) : void{
 
             // Error checking
             if (samples == null)
-                throw new NullPointerException("A sample buffer is required.");
+                throw new Error("A sample buffer is required.");
             if (frames < 0)
-                throw new IllegalArgumentException("Invalid frames.");
+                throw new Error("Invalid frames.");
             if (offset < 0 || offset + frames * 2 > samples.length) {
-                throw new ArrayIndexOutOfBoundsException(
+                throw new Error(
                     "Invalid range in sample buffer.");
             }
-            if (!Float.isFinite(left ) || left  < 0.0f)
-                throw new IllegalArgumentException("Invalid left amplitude.");
-            if (!Float.isFinite(right) || right < 0.0f)
-                throw new IllegalArgumentException("Invalid right amplitude.");
+            if (!Number.isFinite(left ) || left  < 0.0)
+                throw new Error("Invalid left amplitude.");
+            if (!Number.isFinite(right) || right < 0.0)
+                throw new Error("Invalid right amplitude.");
 
             // Process all output frames
-            float[] frame = new float[2];
-            for (int x = 0; x < frames; x++) {
-                float l  = smpPosition;
-                float r = l + smpWidth;
-                float a, b; // Scratch
+            const frame = new Float32Array(2);
+            for (let x = 0; x < frames; x++) {
+                let l  = this.smpPosition;
+                let r = l + this.smpWidth;
+                let a, b; // Scratch
 
                 // Edge case: need the next input sample
-                if (l == 0.0f)
-                    sample();
+                if (l == 0.0)
+                    this.sample();
 
                 // Left and right are in the same input sample
-                if (l < 1.0f) {
+                if (l < 1.0) {
                     a = (l + r) / 2;
-                    frame[0] = smpPrev[0] + (smpNext[0] - smpPrev[0]) * a;
-                    frame[1] = smpPrev[1] + (smpNext[1] - smpPrev[1]) * a;
+                    frame[0] = this.smpPrev[0] + (this.smpNext[0] - this.smpPrev[0]) * a;
+                    frame[1] = this.smpPrev[1] + (this.smpNext[1] - this.smpPrev[1]) * a;
                 }
 
                 // Left and right span input samples
                 else {
 
                     // First partial
-                    a = (l + 1.0f) / 2;
-                    b = 1.0f - l;
-                    frame[0] = (smpPrev[0]+(smpNext[0]-smpPrev[0])*a) * b;
-                    frame[1] = (smpPrev[1]+(smpNext[1]-smpPrev[1])*a) * b;
+                    a = (l + 1.0) / 2;
+                    b = 1.0 - l;
+                    frame[0] = (this.smpPrev[0]+(this.smpNext[0]-this.smpPrev[0])*a) * b;
+                    frame[1] = (this.smpPrev[1]+(this.smpNext[1]-this.smpPrev[1])*a) * b;
 
                     // All wholes
-                    for (int y = (int) Math.floor(r) - 1; y > 0; y--) {
-                        smpPrev[0] = smpNext[0];
-                        smpPrev[1] = smpNext[1];
-                        sample();
-                        frame[0] += (smpPrev[0] + smpNext[0]) / 2;
-                        frame[1] += (smpPrev[1] + smpNext[1]) / 2;
+                    for (let y =  Math.floor(r) - 1; y > 0; y--) {
+                        this.smpPrev[0] = this.smpNext[0];
+                        this.smpPrev[1] = this.smpNext[1];
+                        this.sample();
+                        frame[0] += (this.smpPrev[0] + this.smpNext[0]) / 2;
+                        frame[1] += (this.smpPrev[1] + this.smpNext[1]) / 2;
                     }
 
                     // Record the latest input sample
-                    smpPrev[0] = smpNext[0];
-                    smpPrev[1] = smpNext[1];
+                    this.smpPrev[0] = this.smpNext[0];
+                    this.smpPrev[1] = this.smpNext[1];
 
                     // Last partial
-                    r %= 1.0f;
-                    if (r != 0.0f) {
-                        sample();
+                    r %= 1.0;
+                    if (r != 0.0) {
+                        this.sample();
                         a = r / 2;
-                        frame[0] += (smpPrev[0]+(smpNext[0]-smpPrev[0])*a) * r;
-                        frame[1] += (smpPrev[1]+(smpNext[1]-smpPrev[1])*a) * r;
+                        frame[0] += (this.smpPrev[0]+(this.smpNext[0]-this.smpPrev[0])*a) * r;
+                        frame[1] += (this.smpPrev[1]+(this.smpNext[1]-this.smpPrev[1])*a) * r;
                     }
 
                     // Take the weigted average of all spanned input samples
-                    frame[0] /= smpWidth;
-                    frame[1] /= smpWidth;
+                    frame[0] /= this.smpWidth;
+                    frame[1] /= this.smpWidth;
                 }
 
                 // Output scaling
@@ -1021,8 +1020,8 @@ public class MA3Sampler implements Sampler {
 
                 // Constrain the output
                 if (clamp) {
-                    frame[0] = Math.min(Math.max(frame[0], -1.0f), 1.0f);
-                    frame[1] = Math.min(Math.max(frame[1], -1.0f), 1.0f);
+                    frame[0] = Math.min(Math.max(frame[0], -1.0), 1.0);
+                    frame[1] = Math.min(Math.max(frame[1], -1.0), 1.0);
                 }
 
                 // Output the frame
@@ -1030,42 +1029,42 @@ public class MA3Sampler implements Sampler {
                 samples[offset++] = frame[1];
 
                 // Advance to the next output sample
-                smpPosition = r;
+                this.smpPosition = r;
             }
 
         }
 
         // Initialize all output state.
-        public void reset() {
-            amPhase     = 0;
-            bendOut     = 1.0f;
-            smpPosition = 0.0f;
-            smpPrev[0]  = smpPrev[1] = 0.0f;
-            vibPhase    = 0;
-            volFade     = 0.0f;
-            volLevel    = 1.0f;
-            volOut      = 1.0f;
-            wavRam      = null;
-            fm2ops.clear();
-            fm4ops.clear();
-            for (Channel chan : channels)
+        public  reset() : void {
+            this.amPhase     = 0;
+            this.bendOut     = 1.0;
+            this.smpPosition = 0.0;
+            this.smpPrev[0]  = this.smpPrev[1] = 0.0;
+            this.vibPhase    = 0;
+            this.volFade     = 0.0;
+            this.volLevel    = 1.0;
+            this.volOut      = 1.0;
+            this.wavRam      = null;
+            this.fm2ops.clear();
+            this.fm4ops.clear();
+            for (const chan of this.channels)
                 chan.reset();
-            for (int x = 0; x < wavDrums.length; x++)
-                wavDrums[x] = null;
+            for (let x = 0; x < this.wavDrums.length; x++)
+                this.wavDrums[x] = null;
         };
 
         // Terminate all active notes.
-        public void stopAll() {
-            for (Channel chan : channels) {
-                for (int x = 0; x < chan.notesOn.length; x++)
+        public  stopAll(): void {
+            for (const chan of this.channels) {
+                for (let x = 0; x < chan.notesOn.length; x++)
                     chan.notesOn[x] = null;
-                for (Note note : chan.notesOut)
+                for (const note of chan.notesOut)
                     note.stop();
             }
         };
 
         // Process a SysEx message.
-        public void sysEx(byte[] message) {
+        public  sysEx( message: Uint8Array): void {
 
             // Error checking
             if (
@@ -1082,32 +1081,32 @@ public class MA3Sampler implements Sampler {
                 case 0x01: break; // Seen in Smwemu_N.dll at 1002899D
                 case 0x02: break; // Seen in Smwemu_N.dll at 100289B4
                 case 0x03: // Specify the global fade
-                    setMasterFade(message);
+                    this.setMasterFade(message);
                     break;
                 case 0x04: // Specify FM instrument algorithms
-                    setFMAlgorithms(message);
+                    this.setFMAlgorithms(message);
                     break;
                 case 0x05: // Register wave drum algorithms
-                    setWaveDrums(message);
-                    stopWaveDrums();
+                    this.setWaveDrums(message);
+                    this.stopWaveDrums();
                     break;
                 case 0x06: // Supply wave drum samples
-                    wavRam = decodeAICA(message, 4, message.length - 4);
-                    stopWaveDrums();
+                    this.wavRam = this.decodeAICA(message, 4, message.length - 4);
+                    this.stopWaveDrums();
                     break;
             }
 
         }
 
         // Specify a channel's volume.
-        public void volume(int channel, float volume) {
-            if (!Float.isFinite(volume) || volume < 0.0f)
-                throw new IllegalArgumentException("Invalid volume.");
-            if (channel < 0 || channel >= channels.length)
+        public  volume( channel:number,  volume:number): void {
+            if (!Number.isFinite(volume) || volume < 0.0)
+                throw new Error("Invalid volume.");
+            if (channel < 0 || channel >= this.channels.length)
                 return;
-            Channel chan  = channels[channel];
+            const chan  = this.channels[channel];
             chan.volLevel = volume;
-            chan.volLeft  = (1.0f - chan.volPanning) * chan.volLevel;
+            chan.volLeft  = (1.0 - chan.volPanning) * chan.volLevel;
             chan.volRight =         chan.volPanning  * chan.volLevel;
             chan.onVolume();
         }
@@ -1117,7 +1116,7 @@ public class MA3Sampler implements Sampler {
         /////////////////////////// Private Methods ///////////////////////////
 
         // Retrieve an algorithm for playing an FM drum note
-        private Algorithm getDrumFM(int key) {
+        private  getDrumFM( key: number): Algorithm|null {
 
             // Transform wave drum keys into FM drum keys
             if (key < 0)
@@ -1132,15 +1131,15 @@ public class MA3Sampler implements Sampler {
         }
 
         // Retrieve an algorithm for playing a wave drum note
-        private Algorithm getDrumWave(int key) {
+        private  getDrumWave(key: number): Algorithm | null {
 
             // Error checking
             if (key < -24)
                 return null;
 
             // Select the registered wave algorithm, if available
-            Algorithm[] algs = algWaveDrums;
-            Algorithm   ret  = null;
+            let algs: Algorithm[] = algWaveDrums;
+            let   ret  = null;
             if (key < 0) {
                 algs = wavDrums;
                 key += 24;
@@ -1157,17 +1156,17 @@ public class MA3Sampler implements Sampler {
         }
 
         // Retrieve an algorithm for playing an FM instrument
-        private Algorithm getFMInstrument(int bank, int program) {
-            int       hashKey = bank << 8 | program;
-            Algorithm ret     = null;
+        private getFMInstrument(bank:number, program:number): Algorithm {
+            let       hashKey = bank << 8 | program;
+            let ret     = null;
 
             // Running in 4-algorithm mode
             if (prgInstrumentType == FM_MA3_4OP)
-                ret = fm4ops.get(hashKey);
+                ret = this.fm4ops.get(hashKey);
 
             // Fallback to 2-algorithm mode
             if (ret == null)
-                ret = fm2ops.get(hashKey);
+                ret = this.fm2ops.get(hashKey);
 
             // Fallback to preset
             if (ret == null) {
@@ -1179,48 +1178,48 @@ public class MA3Sampler implements Sampler {
         }
 
         // Master volume has changed
-        private void onVolume() {
-            volOut = (1.0f - volFade) * volLevel;
-            for (Channel chan : channels)
+        private onVolume(): void {
+            this.volOut = (1.0 - this.volFade) * this.volLevel;
+            for (const chan of this.channels)
                 chan.onVolume();
         }
 
         // Produce one input sample
-        private void sample() {
-            smpNext[0] = smpNext[1] = 0.0f;
-            for (Channel chan : channels)
+        private  sample(): void {
+            this.smpNext[0] = this.smpNext[1] = 0.0;
+            for (const chan of this.channels)
                 chan.render();
-            amPhase = (amPhase + 1) % 0x34000;
-            vibPhase++;
+            this.amPhase = (this.amPhase + 1) % 0x34000;
+            this.vibPhase++;
         }
 
         // Specify FM algorithms
-        private void setFMAlgorithms(byte[] message) {
+        private  setFMAlgorithms( message:Uint8Array) :void{
 
             // Process all algorithms in the message
-            for (int offset = 4; offset < message.length;) {
+            for (let offset = 4; offset < message.length;) {
 
                 // Algorithm type: 1=two-operator, 2=four-operator
-                int type = message[offset] & 0xFF;
+                let type = message[offset] & 0xFF;
                 if (type != 1 && type != 2)
                     break;
 
                 // Error checking
-                int size = type == 1 ? 20 : 34;
+                let size = type == 1 ? 20 : 34;
                 if (offset + size > message.length)
                     break;
 
                 // Decode the algorithm
-                Algorithm algorithm;
+                let algorithm;
                 try { algorithm = new Algorithm(offset, message); }
-                catch (Exception e) { break; }
+                catch ( e) { break; }
 
                 // Error checking
                 if (type == 1 && algorithm.operators.length == 4)
                     continue;
 
                 // Register the algorithm
-                (type == 1 ? fm2ops : fm4ops).put(
+                (type == 1 ? this.fm2ops : this.fm4ops).set(
                     (message[offset + 1] & 0xFF) << 8 | // Bank
                      message[offset + 2] & 0xFF,        // Program
                     algorithm
@@ -1233,26 +1232,26 @@ public class MA3Sampler implements Sampler {
         }
 
         // Specify the global fade.
-        private void setMasterFade(byte[] message) {
+        private  setMasterFade( message: Uint8Array) : void{
             if (message.length < 5)
                 return;
-            volFade = (message[4] & 0x7F) / 127.0f;
-            onVolume();
+            this.volFade = (message[4] & 0x7F) / 127.0;
+            this.onVolume();
         }
 
         // Decode and register wave drum definitions
-        private void setWaveDrums(byte[] message) {
+        private  setWaveDrums( message: Uint8Array): void {
 
             // De-register existing wave drums
-            for (int x = 0; x < wavDrums.length; x++)
-                wavDrums[x] = null;
+            for (let x = 0; x < this.wavDrums.length; x++)
+                this.wavDrums[x] = null;
 
             // Decode wave drums
-            int count = (message.length - 4) / 18;
-            for (int x = 0, src = 4; x < count; x++, src += 18) {
+            let count = (message.length - 4) / 18;
+            for (let x = 0, src = 4; x < count; x++, src += 18) {
 
                 // Working variables
-                Algorithm drum = new Algorithm(message, src + 1);
+                const drum = new Algorithm(message, src + 1);
 
                 // Error checking
                 if (
@@ -1265,15 +1264,15 @@ public class MA3Sampler implements Sampler {
                 ) continue;
 
                 // Register the wave drum
-                wavDrums[drum.drumKey] = drum;
+                this.wavDrums[drum.drumKey] = drum;
             }
 
         }
 
         // Terminate any existing wave drum notes
-        private void stopWaveDrums() {
-            for (Channel chan : channels)
-            for (Note note : chan.notesOut) {
+        private  stopWaveDrums() : void{
+            for (const chan of this.channels)
+            for (const note of chan.notesOut) {
                 if (note.algorithm.isWave)
                     note.stop();
             }
@@ -1286,51 +1285,51 @@ public class MA3Sampler implements Sampler {
     ////////////////////////////////// Note ///////////////////////////////////
 
     // Audio source
-    private class Note {
+    private Note =  class {
 
         // OPL registers
-        int block;    // Octave index
-        int f_number; // Frequency divider
+         block = 0;    // Octave index
+         f_number = 0; // Frequency divider
 
         // Instance fields
-        int        amPhase;     // Amplitude modulator phase
-        float      advance;     // Frequency advancement when dissociated
-        Algorithm  algorithm;   // FM operator algorithm
-        float      ampLeft;     // Effective left stereo amplitude
-        float      ampRight;    // Effective right stereo amplitude
-        Channel    channel;     // Encapsulating channel
-        boolean    envDone;     // All operator envelopes are finished
-        float      freqBase;    // Base frequency
-        Instance   instance;    // Encapsulating instance
-        int        key;         // Key index within channel
-        Operator[] operators;   // OPL operators
-        boolean    playing;     // Note is generating output
-        float      sample;      // Current output sample
-        float      volBase;     // Base volume
-        float      volLeftOut;  // Left stereo output amplitude
-        float      volRightOut; // Right stereo output amplitude
+        amPhase = 0;     // Amplitude modulator phase
+        advance = 0;     // Frequency advancement when dissociated
+        algorithm: Algorithm;   // FM operator algorithm
+        ampLeft = 0;     // Effective left stereo amplitude
+        ampRight = 0;    // Effective right stereo amplitude
+        channel: Channel;     // Encapsulating channel
+        envDone = false;     // All operator envelopes are finished
+        freqBase = 0;    // Base frequency
+        instance: Instance;    // Encapsulating instance
+        key = 0;         // Key index within channel
+        operators : Operator[];   // OPL operators
+        playing = false;     // Note is generating output
+        sample = 0;      // Current output sample
+        volBase = 0;     // Base volume
+        volLeftOut = 0;  // Left stereo output amplitude
+        volRightOut = 0; // Right stereo output amplitude
 
 
 
         //////////////////////////// Constructors /////////////////////////////
 
-        private Note(Channel channel, int key, Algorithm algorithm) {
+        constructor( channel: Channel,  key: number,  algorithm: Algorithm) {
 
             // Instance fields
             this.algorithm = algorithm;
-            envDone        = false;
-            ampLeft        = 0.0f;
-            ampRight       = 0.0f;
+            this.envDone        = false;
+            this.ampLeft        = 0.0;
+            this.ampRight       = 0.0;
             this.channel   = channel;
-            instance       = channel.instance;
+            this.instance       = channel.instance;
             this.key       = key;
-            operators      = new Operator[algorithm.operators.length];
-            playing        = true;
-            sample         = 0.0f;
+            this.operators      = new Array<MA3Sampler.Operator>(algorithm.operators.length);
+            this.playing        = true;
+            this.sample         = 0.0;
 
             // Operators
-            for (int x = 0; x < operators.length; x++)
-                operators[x] = new Operator(this, algorithm.operators[x]);
+            for (let x = 0; x < this.operators.length; x++)
+                this.operators[x] = new Operator(this, algorithm.operators[x]);
         }
 
 
@@ -1338,30 +1337,30 @@ public class MA3Sampler implements Sampler {
         /////////////////////////// Private Methods ///////////////////////////
 
         // Perform easing on an amplitude controller
-        private float ease(float level, float target) {
+        private  ease( level:number,  target:number): number {
             return
-                level < target ? Math.min(target, level + instance.volRate) :
-                level > target ? Math.max(target, level - instance.volRate) :
+                level < target ? Math.min(target, level + this.instance.volRate) :
+                level > target ? Math.max(target, level - this.instance.volRate) :
                 level
             ;
         }
 
         // Key-off processing
-        private void off() {
+        private  off(): void {
 
             // A data-supplied FM algorithm never decays
-            if (algorithm.isForever) {
+            if (this.algorithm.isForever) {
                 stop();
                 return;
             }
 
             // Ignore key-off for wave drums
             // Should apply to certain hi-hat notes, but needs research
-            if (algorithm.isWave)
+            if (this.algorithm.isWave)
                 return;
 
             // Regular processing: switch all operators to release stage
-            for (Operator op : operators) {
+            for (const op of this.operators) {
                 if (op.envStage == ENV_DONE || op.xof)
                     continue;
                 op.envRate  = op.rr;
@@ -1370,138 +1369,138 @@ public class MA3Sampler implements Sampler {
         }
 
         // An envelope has finished
-        private void onEnvelopeDone() {
-            envDone = true;
+        private  onEnvelopeDone() : void{
+            this.envDone = true;
 
             // Test all relevant operators
-            int flags = algorithm.isWave ? 1 : ENV_FLAGS[algorithm.alg];
-            for (int x = 0; x < operators.length; x++, flags >>= 1) {
+            let flags = this.algorithm.isWave ? 1 : MA3Sampler.ENV_FLAGS[this.algorithm.alg];
+            for (let x = 0; x < this.operators.length; x++, flags >>= 1) {
                 if ((flags & 1) != 0)
-                    envDone = envDone && operators[x].envStage == ENV_DONE;
+                    this.envDone = this.envDone && this.operators[x].envStage == ENV_DONE;
             }
 
             // If all relevant operators are done, shut off the note
-            if (envDone)
-                playing = false;
+            if (this.envDone)
+                this.playing = false;
         }
 
         // Frequency has changed
-        private void onFrequency(double bend) {
+        private  onFrequency( bend: number): void {
 
             // Wave notes don't use oscillators
-            if (algorithm.isWave)
+            if (this.algorithm.isWave)
                 return;
 
             // Compute BLOCK and F_NUMBER
-            double freq = algorithm.isDrum ? freqBase : freqBase * bend;
-            block       = Math.min(   7, Math.max(0, (int)
+            const freq = this.algorithm.isDrum ? this.freqBase : this.freqBase * bend;
+            this.block       = Math.min(   7, Math.max(0, 
                 (Math.round(Math.log(freq / 440) * MAGIC_B) + 57) / 12));
-            f_number    = Math.min(1023, Math.max(0, (int)
-                Math.round(freq * (1 << 20 - block) * MAGIC_F)));
+            this.f_number    = Math.min(1023, Math.max(0, 
+                Math.round(freq * (1 << 20 - this.block) * MAGIC_F)));
 
             // Notify operators
-            for (Operator op : operators)
+            for (const op of this.operators)
                 op.onFrequency();
         }
 
         // Master volume has changed
-        private void onVolume() {
-            volLeftOut  = volBase * algorithm.volLeft  * channel.volLeftOut;
-            volRightOut = volBase * algorithm.volRight * channel.volRightOut;
+        private  onVolume(): void {
+            this.volLeftOut  = this.volBase * this.algorithm.volLeft  * this.channel.volLeftOut;
+            this.volRightOut = this.volBase * this.algorithm.volRight * this.channel.volRightOut;
         }
 
         // Render the next input sample
-        private boolean render() {
+        private render(): boolean {
 
             // Compute desired left and right volume levels
-            float tgtLeft  = 0.0f;
-            float tgtRight = 0.0f;
-            if (!envDone) {
-                tgtLeft  = volLeftOut;
-                tgtRight = volRightOut;
+            let tgtLeft  = 0.0;
+            let tgtRight = 0.0;
+            if (!this.envDone) {
+                tgtLeft  = this.volLeftOut;
+                tgtRight = this.volRightOut;
             }
 
             // Generate the sample
-            float sample = !algorithm.isWave ? sampleFM() :
-                operators[0].sample(0, false) / 32768.0f;
-            instance.smpNext[0] += sample * ampLeft;
-            instance.smpNext[1] += sample * ampRight;
+            let sample = !this.algorithm.isWave ? this.sampleFM() :
+                this.operators[0].sample(0, false) / 32768.0;
+            this.instance.smpNext[0] += sample * this.ampLeft;
+            this.instance.smpNext[1] += sample * this.ampRight;
 
             // Adjust stereo levels
-            ampLeft  = ease(ampLeft , tgtLeft );
-            ampRight = ease(ampRight, tgtRight);
+            this.ampLeft  = this.ease(this.ampLeft , tgtLeft );
+            this.ampRight = this.ease(this.ampRight, tgtRight);
 
             // Indicate whether the note has finished generating output
-            return !playing && ampLeft == 0 && ampRight == 0;
+            return !this.playing && this.ampLeft == 0 && this.ampRight == 0;
         }
 
         // Generate an FM sample
-        private float sampleFM() {
-            int out1, out2, out3, out4;
-            int ret = 0;
-            switch (algorithm.alg) {
+        private sampleFM() :number{
+            let out1, out2, out3, out4;
+            let ret = 0;
+            switch (this.algorithm.alg) {
                 case 0:
-                    out1 = operators[0].sample(0, true);
-                    out2 = operators[1].sample(out1, false);
+                    out1 = this.operators[0].sample(0, true);
+                    out2 = this.operators[1].sample(out1, false);
                     ret  = out2;
                     break;
                 case 1:
-                    out1 = operators[0].sample(0, true);
-                    out2 = operators[1].sample(0, false);
+                    out1 = this.operators[0].sample(0, true);
+                    out2 = this.operators[1].sample(0, false);
                     ret  = out1 + out2;
                     break;
                 case 2:
-                    out1 = operators[0].sample(0, true);
-                    out2 = operators[1].sample(0, false);
-                    out3 = operators[2].sample(0, true);
-                    out4 = operators[3].sample(0, false);
+                    out1 = this.operators[0].sample(0, true);
+                    out2 = this.operators[1].sample(0, false);
+                    out3 = this.operators[2].sample(0, true);
+                    out4 = this.operators[3].sample(0, false);
                     ret  = out1 + out2 + out3 + out4;
                     break;
                 case 3:
-                    out1 = operators[0].sample(0, true);
-                    out2 = operators[1].sample(0, false);
-                    out3 = operators[2].sample(out2, false);
-                    out4 = operators[3].sample(out1 + out3, false);
+                    out1 = this.operators[0].sample(0, true);
+                    out2 = this.operators[1].sample(0, false);
+                    out3 = this.operators[2].sample(out2, false);
+                    out4 = this.operators[3].sample(out1 + out3, false);
                     ret  = out4;
                     break;
                 case 4:
-                    out1 = operators[0].sample(0, true);
-                    out2 = operators[1].sample(out1, false);
-                    out3 = operators[2].sample(out2, false);
-                    out4 = operators[3].sample(out3, false);
+                    out1 = this.operators[0].sample(0, true);
+                    out2 = this.operators[1].sample(out1, false);
+                    out3 = this.operators[2].sample(out2, false);
+                    out4 = this.operators[3].sample(out3, false);
                     ret  = out4;
                     break;
                 case 5:
-                    out1 = operators[0].sample(0, true);
-                    out2 = operators[1].sample(out1, false);
-                    out3 = operators[2].sample(0, true);
-                    out4 = operators[3].sample(out3, false);
+                    out1 = this.operators[0].sample(0, true);
+                    out2 = this.operators[1].sample(out1, false);
+                    out3 = this.operators[2].sample(0, true);
+                    out4 = this.operators[3].sample(out3, false);
                     ret  = out2 + out4;
                     break;
                 case 6:
-                    out1 = operators[0].sample(0, true);
-                    out2 = operators[1].sample(0, false);
-                    out3 = operators[2].sample(out2, false);
-                    out4 = operators[3].sample(out3, false);
+                    out1 = this.operators[0].sample(0, true);
+                    out2 = this.operators[1].sample(0, false);
+                    out3 = this.operators[2].sample(out2, false);
+                    out4 = this.operators[3].sample(out3, false);
                     ret  = out1 + out4;
                     break;
                 case 7:
-                    out1 = operators[0].sample(0, true);
-                    out2 = operators[1].sample(0, false);
-                    out3 = operators[2].sample(out2, false);
-                    out4 = operators[3].sample(0, false);
+                    out1 = this.operators[0].sample(0, true);
+                    out2 = this.operators[1].sample(0, false);
+                    out3 = this.operators[2].sample(out2, false);
+                    out4 = this.operators[3].sample(0, false);
                     ret  = out1 + out3 + out4;
                     break;
             }
-            return ret / 8170.0f; // Twice the max sample value
+            return ret / 8170.0; // Twice the max sample value
         }
 
         // Terminate playback
-        private void stop() {
-            envDone = true;
-            playing = false;
-            volBase = 0.0f;
-            for (Operator op : operators) {
+        private  stop(): void {
+            this.envDone = true;
+            this.playing = false;
+            this.volBase = 0.0;
+            for (const op of this.operators) {
                 op.envLevel = 511;
                 op.envStage = ENV_DONE;
             }
@@ -1514,45 +1513,45 @@ public class MA3Sampler implements Sampler {
     //////////////////////////////// Operator /////////////////////////////////
 
     // Individual FM algorithm operator
-    private static class Operator {
+    private static Operator = class {
 
         // OPL registers
-        int     ar;    // Envelope attack rate
-        int     dam;   // Amplitude modulation depth
-        int     dr;    // Envelope decay rate
-        int     dt;    // Detune shift
-        int     dvb;   // Frequency modulation depth
-        boolean eam;   // Enable amplutide modulation
-        boolean evb;   // Enable frequency modulation
-        int     fb;    // Feedback rate index
-        int     ksl;   // Attenuation index per octave
-        int     ksr;   // Envelope rate modifier scale
-        int     multi; // Frequency multiplier
-        int     rr;    // Envelope release rate
-        int     sl;    // Envelope sustain level
-        int     sr;    // Envelope sustain rate
-        boolean sus;   // MIDI Hold 1 is supported
-        int     tl;    // Envelope attenuation
-        int     ws;    // Wave function index
-        boolean xof;   // Ignore key-off response
+        ar  =0;  // Envelope attack rate
+        dam =0;  // Amplitude modulation depth
+        dr  =0;  // Envelope decay rate
+        dt  =0;  // Detune shift
+        dvb =0;  // Frequency modulation depth
+         eam = false;   // Enable amplutide modulation
+         evb = false;   // Enable frequency modulation
+        fb=0;    // Feedback rate index
+        ksl=0;   // Attenuation index per octave
+        ksr=0;   // Envelope rate modifier scale
+        multi = 0; // Frequency multiplier
+        rr = 0;    // Envelope release rate
+        sl = 0;    // Envelope sustain level
+        sr = 0;    // Envelope sustain rate
+         sus = false;   // MIDI Hold 1 is supported
+        tl = 0;    // Envelope attenuation
+        ws = 0;    // Wave function index
+         xof = false;   // Ignore key-off response
 
         // Instance fields
-        Algorithm algorithm; //     Encapsulating algorithm
-        int       amPhase;   // u14 Amplitude modulation counter
-        int       envLevel;  // u9  Current envelope level
-        int       envOut;    // u9  Effective envelope output
-        int       envPhase;  // u15 Envelope phase counter
-        int       envRate;   //     Current envelope rate of change
-        int       envRof;    //     Envelope rate offset modifier
-        int       envStage;  //     Envelope processing stage
-        int       fb0;       //     Most recent output sample
-        int       fb1;       //     Second-most recent output sample
-        Instance  instance;  //     Encapsulating instance
-        boolean   isValid;   //     Wave drum parameters are valid
-        int       kslOut;    //     KSL attenuation level
-        Note      note;      //     Encapsulating note
-        int       oscPhase;  // u10 Oscillator counter
-        float     wavSample; //     Current wave source sample
+        algorithm: Algorithm; //     Encapsulating algorithm
+    	amPhase = 0;   // u14 Amplitude modulation counter
+    	envLevel = 0;  // u9  Current envelope level
+    	envOut = 0;    // u9  Effective envelope output
+    	envPhase = 0;  // u15 Envelope phase counter
+    	envRate = 0;   //     Current envelope rate of change
+    	envRof = 0;    //     Envelope rate offset modifier
+    	envStage = 0;  //     Envelope processing stage
+    	fb0 = 0;       //     Most recent output sample
+    	fb1 = 0;       //     Second-most recent output sample
+        instance: Instance;  //     Encapsulating instance
+        isValid = false;   //     Wave drum parameters are valid
+        kslOut = 0;    //     KSL attenuation level
+        note: Note;      //     Encapsulating note
+        oscPhase = 0;  // u10 Oscillator counter
+        wavSample = 0; //     Current wave source sample
 
 
 
@@ -1803,7 +1802,7 @@ public class MA3Sampler implements Sampler {
     ///////////////////////////////// Assets //////////////////////////////////
 
     // Instrument algorithms for MA-2
-    private static Algorithm[] MA2_INSTRUMENTS = Algorithm.from(new String[] {
+    private static MA2_INSTRUMENTS = this.Algorithm.from([
         "AXgAABDyBUo6gAAQ8gZ6AIA=", // GrandPno
         "AXgABBDyBFo+oAAQ8gZaAKA=", // BritePno
         "AXgABBDxBVoZgAAQ8gZ6AIA=", // E.GrandP
@@ -1932,10 +1931,10 @@ public class MA3Sampler implements Sampler {
         "A3gAA/D2AAoA5gcATwUKAOc=", // Helicptr
         "A3gAAGD/AQAA4ANAUgcTAOE=", // Applause
         "AXgAAVDzAPAQ4APw9oiwAOY="  // Gunshot
-    }, false, false);
+	], false, false);
 
     // Drum algorithms for MA-2
-    private static Algorithm[] MA2_DRUMS = Algorithm.from(new String[] {
+    private static MA2_DRUMS = this.Algorithm.from([
         "AXhPADD3APoMwQQwqP/6AMY=", // SeqClick H
         "AXg9AAD4ADoA4AQQmkRaIOA=", // Brush Tap
         "AXgzAUBoBgoU4AAAWERKXOA=", // Brush Swirl L
@@ -1997,10 +1996,10 @@ public class MA3Sampler implements Sampler {
         "AXhfAPDyZloA5ADwmIhqAOc=", // Shaker
         "A3g1APD0AAAOwwbwh0QwAMQ=", // Jingle Bell
         "AXgyAOA0VeoAYwCQRjMKGWE="  // Belltree
-    }, true, false);
+	], true, false);
 
     // FM instrument algorithms for MA-3, 2 operators
-    private static Algorithm[] MA3_INSTRUMENTS_2OP=Algorithm.from(new String[]{
+    private static MA3_INSTRUMENTS_2OP = this.Algorithm.from([
         "AXgADBD0IyhCZQ0Q8hY4AgA=", // GrandPno
         "AXgADBD0IzhBjQ0Q8hY4EAA=", // BritePno
         "AXgADBDxFTpkwA0Q8SZoIAA=", // E.GrandP
@@ -2129,10 +2128,10 @@ public class MA3Sampler implements Sampler {
         "A3gAA/D2AAoA7gsAIAUKAAA=", // Helicptr
         "AHgAC2D/AQgA+AtAUgUTEAA=", // Applause
         "AXgAAVBkAPAM4gPw9oiwAAY="  // Gunshot
-    }, false, false);
+	], false, false);
 
     // FM instrument algorithms for MA-3, 4 operators
-    private static Algorithm[] MA3_INSTRUMENTS_4OP=Algorithm.from(new String[]{
+    private static MA3_INSTRUMENTS_4OP = this.Algorithm.from([
         "AXsACBD3BvCdCAxQ4yMgcwAJENEUMFgADRDTJkACAA==", // GrandPno
         "AXsADBDyIlCeAAhQ8iPwcgANEPIi0GYADRDyFUAoAA==", // BritePno
         "AX0ADEDSJGBRwA0Q0RZwIgAMINM04C0ADSDRFfAiAA==", // E.GrandP
@@ -2261,10 +2260,10 @@ public class MA3Sampler implements Sampler {
         "A30AC/D2AAoErgsAIAUKEAAIAPAACmAOCAAgBQosAA==", // Helicptr
         "AX0ACAD8AQAA+AgAQgUAIAAKkGAB9AD4CDAwd/AcAA==", // Applause
         "AX0ACVDzAPAs4Avw9oiwEAYLUPIA8AjhC1D2iLBoBg=="  // Gunshot
-    }, false, false);
+	], false, false);
 
     // FM drum algorithms for MA-3, 2 operators
-    private static Algorithm[] MA3_DRUMS_2OP = Algorithm.from(new String[] {
+    private static MA3_DRUMS_2OP = this.Algorithm.from([
         "AXlYAC3wnwYIUAAl+p8ZAAA=", // SeqClick H
         "AXgdAAHWWQoA+AABiIkmEAA=", // Brush Tap
         "AHg8ABqiAwQA+AIAZQcyKGA=", // Brush Swirl L
@@ -2326,10 +2325,10 @@ public class MA3Sampler implements Sampler {
         "AbheAKWzMSkC4AD5fZZKGAA=", // Shaker
         "A8FMAfnFZiMCmgP1u10UABM=", // Jingle Bell
         "AdA+APE0VeoAYwCRR0MKGgE="  // Belltree
-    }, true, false);
+	], true, false);
 
     // FM drum algorithms for MA-3, 4 operators
-    private static Algorithm[] MA3_DRUMS_4OP = Algorithm.from(new String[] {
+    private static MA3_DRUMS_4OP = this.Algorithm.from([
         "AX1IAGHw/wrgxARR+P/KAAAAofv/upwGBFHr//oEAA==", // SeqClick H
         "AX1BAFH4ADoA4AABmIu6AgAAwfhuOpAGABHNiAqyBg==", // Brush Tap
         "AX0sAAD1BgkA8ggAmApvACMAAPAP8ADwABA2P25UAA==", // Brush Swirl L
@@ -2391,10 +2390,10 @@ public class MA3Sampler implements Sampler {
         "AbwnAHGQNWoA4AQxlkRqEAAAweQmSgQAAPGalIoIBg==", // Shaker
         "AcVcAGF2AApQAgAha1VKAAMOYTACChwCCJF1JvoAAg==", // Jingle Bell
         "AdVkADHEIAtg8wAhQ1VPAAIPcTACDxwCCDFUJm8IDQ=="  // Belltree
-    }, true, false);
+	], true, false);
 
     // Wave drum algorithms for MA-3
-    private static Algorithm[] MA3_DRUMS_WAVE = Algorithm.from(new String[] {
+    private static MA3_DRUMS_WAVE = this.Algorithm.from([
         "Hz6AeQAI8PAQAAAAC5sLm4E=", // Snare L
         "ISMoeQAI8PAQAAAAA6kDqYA=", // Bass Drum L
         "IycQeQAI8PAQAAAAA6kDqYA=", // Bass Drum M
@@ -2416,10 +2415,10 @@ public class MA3Sampler implements Sampler {
         "N1IIaQBY8PAoAAAADfkV24Y=", // Splash Cymbal
         "OTawWQBY8PAAAAAADfkV24Y=", // Crash Cymbal 2
         "O0ZQWQBY8PAwAAAABjoSwIU="  // Ride Cymbal 2
-    }, true, true);
+	], true, true);
 
     // Wave synthesis ROM for MA-3
-    private static int[][] MA3_WAVEROM = waveRom(new String[] {
+    private static MA3_WAVEROM = this.waveRom([
         "93cXB1/wgn9PubQYiZEIiIAIiIAIiIAIiIC3cOQ3L9QCaagwCH2JgpkRWwCYAjvwSvGE"+
         "X8BZCxiooBvHQIkBKbmXgYgTW6iVEAgrATsAsAOAAI3UkvEoPaqypigdiAkYkWm7paGi"+
         "OQqZWyiNxSAaCRCYtRIa84AYAKUwCcpoC4EpoZgumacBCbhrgCiBGyoMlCg8SPCBCSmw"+
@@ -2644,6 +2643,6 @@ public class MA3Sampler implements Sampler {
         "CsQBGaiDLNWCS9IhHeQTGwiyShmBL6Eo0INNqDCLxREamDJPm5QZsSC5lhnTERqgET6K"+
         "Ij/JpRjRk4A4LhkJkKJYT6mlOcikKNCkABhLOzyppMMA8rUA0bQwDLMACRDQEpmC87K0"+
         "tHqJAVyqpUkskJEQiDkKsMe0eCyIegySOYqieRvzAonUAgkACYApCVq4lQg="
-    });
+    ]);
 
 }
