@@ -991,7 +991,7 @@ class Note {
 	public off(): void {
 		// A data-supplied FM algorithm never decays
 		if (this.algorithm.isForever) {
-			stop();
+			this.stop();
 			return;
 		}
 
