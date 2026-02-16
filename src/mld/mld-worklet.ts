@@ -1,3 +1,4 @@
+import { MA3Sampler } from './core/MA3Sampler';
 import { MLD } from './core/MLD';
 import { MLDPlayer } from './core/MLDPlayer';
 import { SineSampler } from './core/SineSampler';
@@ -30,7 +31,8 @@ class MLDPlayerProcessor extends AudioWorkletProcessor {
 		try {
 			const bytes = new Uint8Array(msg.buffer);
 			const mld = new MLD(bytes);
-			const sampler = new SineSampler();
+			// const sampler = new SineSampler();
+			const sampler = new MA3Sampler();
 			this.player = new MLDPlayer(mld, sampler, sampleRate);
 			this.sendMldInfo(mld);
 		} catch (err) {
@@ -43,14 +45,13 @@ class MLDPlayerProcessor extends AudioWorkletProcessor {
 	private sendMldInfo(mld: MLD) {
 		const mldInfo = {
 			type: 'info',
-			title: mld.getTitle() ?? null,
-			version: mld.getVersion() ?? null,
-			date: mld.getDate() ?? null,
-			copyright: mld.getCopyright() ?? null,
+			title: mld.getTitle(),
+			version: mld.getVersion(),
+			date: mld.getDate(),
+			copyright: mld.getCopyright(),
 			durationLooping: mld.getDuration(false),
 			durationNoLoop: mld.getDuration(true)
 		};
-		console.log(mldInfo);
 		this.port.postMessage(mldInfo);
 	}
 
