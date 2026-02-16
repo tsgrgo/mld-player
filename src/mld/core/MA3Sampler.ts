@@ -1,3 +1,4 @@
+import { toByteArray } from 'base64-js';
 import type { Sampler, SamplerInstance } from './Sampler';
 
 /**
@@ -75,63 +76,8 @@ const MAGIC_F = 684 / 33868800.0;
 const MINUS = 0x80000000; // Wave negative
 const ZERO = 0x1000; // Wave minimum
 
-// function base64decode(b64: string): Uint8Array {
-// 	const clean = b64.replace(/\s+/g, '');
-// 	const bin = atob(clean);
-// 	const bytes = new Uint8Array(bin.length);
-// 	for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i) & 0xff;
-// 	return bytes;
-// }
-
-// const BASE64_TABLE = new Uint8Array(256);
-// BASE64_TABLE.fill(255);
-// for (let i = 0; i < 26; i++) {
-// 	BASE64_TABLE[65 + i] = i; // A-Z
-// 	BASE64_TABLE[97 + i] = 26 + i; // a-z
-// }
-// for (let i = 0; i < 10; i++) {
-// 	BASE64_TABLE[48 + i] = 52 + i; // 0-9
-// }
-// BASE64_TABLE[43] = 62; // +
-// BASE64_TABLE[47] = 63; // /
-
-// function base64decode(b64: string): Uint8Array {
-// 	const clean = b64.replace(/\s+/g, '').replace(/=+$/g, '');
-// 	const len = clean.length;
-
-// 	// 4 chars -> 3 bytes
-// 	const outLen = (len * 3) >> 2;
-// 	const out = new Uint8Array(outLen);
-
-// 	let o = 0;
-// 	let i = 0;
-
-// 	while (i < len) {
-// 		const c0 = BASE64_TABLE[clean.charCodeAt(i++)];
-// 		const c1 = BASE64_TABLE[clean.charCodeAt(i++)];
-// 		const c2 = i < len ? BASE64_TABLE[clean.charCodeAt(i++)] : 255;
-// 		const c3 = i < len ? BASE64_TABLE[clean.charCodeAt(i++)] : 255;
-
-// 		if ((c0 | c1) === 255) throw new Error('Invalid base64');
-
-// 		out[o++] = (c0 << 2) | (c1 >> 4);
-
-// 		if (c2 !== 255) {
-// 			out[o++] = ((c1 & 15) << 4) | (c2 >> 2);
-// 			if (c3 !== 255) {
-// 				out[o++] = ((c2 & 3) << 6) | c3;
-// 			}
-// 		}
-// 	}
-
-// 	return o === out.length ? out : out.slice(0, o);
-// }
-
-import { toByteArray } from 'base64-js';
-
 function base64decode(b64: string): Uint8Array {
-	const clean = b64.replace(/\s+/g, '');
-	return toByteArray(clean); // Uint8Array
+	return toByteArray(b64);
 }
 
 //////////////////////////////// Algorithm ////////////////////////////////
