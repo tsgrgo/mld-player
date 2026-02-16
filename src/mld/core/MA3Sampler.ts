@@ -1034,10 +1034,17 @@ class Note {
 		const freq = this.algorithm.isDrum
 			? this.freqBase
 			: this.freqBase * bend;
+
 		this.block = Math.min(
 			7,
-			Math.max(0, (Math.round(Math.log(freq / 440) * MAGIC_B) + 57) / 12)
+			Math.max(
+				0,
+				Math.floor(
+					(Math.round(Math.log(freq / 440) * MAGIC_B) + 57) / 12
+				)
+			)
 		);
+
 		this.f_number = Math.min(
 			1023,
 			Math.max(0, Math.round(freq * (1 << (20 - this.block)) * MAGIC_F))
