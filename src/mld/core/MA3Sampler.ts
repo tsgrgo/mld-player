@@ -409,7 +409,7 @@ class Instance implements SamplerInstance {
 		this.sampler = sampler;
 
 		// Instance fields
-		this.channels = new Array<Channel>(10);
+		this.channels = new Array<Channel>(16);
 		this.fm2ops = new Map<number, Algorithm>();
 		this.fm4ops = new Map<number, Algorithm>();
 		this.sampleRate = sampleRate;
