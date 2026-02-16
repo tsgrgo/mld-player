@@ -898,7 +898,7 @@ class Instance implements SamplerInstance {
 		for (let x = 0; x < this.wavDrums.length; x++) this.wavDrums[x] = null;
 
 		// Decode wave drums
-		const count = (message.length - 4) / 18;
+		const count = Math.floor((message.length - 4) / 18);
 		for (let x = 0, src = 4; x < count; x++, src += 18) {
 			// Working variables
 			const drum = Algorithm.waveDrumConstructor(message, src + 1);
@@ -1373,8 +1373,9 @@ class Operator {
 			if (samples != null && this.wavSample < this.algorithm.ep) {
 				// Produce the output sample
 				x = Math.floor(this.wavSample);
-				this.fb0 =
-					(samples[x] * MA3Sampler.WAVE_ENV[this.envOut]) / 32767;
+				this.fb0 = Math.floor(
+					(samples[x] * MA3Sampler.WAVE_ENV[this.envOut]) / 32767
+				);
 
 				// Advance to the next sample
 				this.wavSample += this.algorithm.wavAdvance;
@@ -1852,7 +1853,7 @@ export class MA3Sampler implements Sampler {
 								),
 								32767
 							) +
-							(Xn * 254) / 255, // Accumulate
+							Math.floor((Xn * 254) / 255), // Accumulate
 						-32768
 					),
 					32767
