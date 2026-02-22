@@ -35,6 +35,7 @@ export async function createMldPlayer() {
 		ctx,
 		node,
 		worker,
+		ringBuffer,
 		load: (arrayBuffer: ArrayBuffer) => {
 			worker.postMessage({ type: 'load', buffer: arrayBuffer }, [
 				arrayBuffer
