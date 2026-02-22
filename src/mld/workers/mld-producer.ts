@@ -36,6 +36,7 @@ self.onmessage = (e: MessageEvent<Msg>) => {
 
 		player = new MLDPlayer(mld, sampler, sampleRate);
 
+		buffer.clear();
 		sendMldInfo(mld);
 	} else if (msg.type === 'stop') {
 		running = false;
@@ -76,7 +77,7 @@ async function pump() {
 		}
 
 		// Not enough space
-		// await sleep(200);
+		await sleep(10);
 	}
 }
 
