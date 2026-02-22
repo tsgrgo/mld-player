@@ -1,4 +1,3 @@
-import { playMldInWorklet } from './mld/playMldInWorklet';
 import { createMldPlayer } from './mld/createMldPlayer';
 
 function el<K extends keyof HTMLElementTagNameMap>(
@@ -37,6 +36,8 @@ function clearInfo() {
 	pDurationNoLoop.textContent = '';
 }
 
+let mldPlayer: Awaited<ReturnType<typeof createMldPlayer>>; // Damn this is ugly
+
 // eslint-disable-next-line @typescript-eslint/no-misused-promises
 input.addEventListener('change', async () => {
 	clearInfo();
@@ -49,9 +50,8 @@ input.addEventListener('change', async () => {
 
 	status.textContent = 'Reading...';
 
-	// void playMldInWorklet(file);
-	const res = await createMldPlayer();
-	res.load(await file.arrayBuffer());
+	if (!mldPlayer) mldPlayer = await createMldPlayer();
+	mldPlayer.load(await file.arrayBuffer());
 
 	// try {
 	// 	const bytes = await readAsUint8Array(file);

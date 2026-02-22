@@ -1,4 +1,4 @@
-import { SharedRingBuffer } from './SharedRingBuffer';
+import { SharedRingBuffer } from '../SharedRingBuffer';
 
 type SabMsg = { type: 'sab'; sab: SharedArrayBuffer };
 type Msg = SabMsg;

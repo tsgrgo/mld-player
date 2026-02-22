@@ -1,5 +1,3 @@
-import { fromByteArray } from 'base64-js';
-
 //////////////////////////////// Constants ////////////////////////////////
 
 // FourCCs
@@ -515,10 +513,10 @@ export class MLD {
 		return ret;
 	}
 
-	// Shift JIS strings to b64, decoded by UI thread
+	// Decode a string as Shift_JIS
 	private shiftJIS(bytes: Uint8Array): string {
 		try {
-			return fromByteArray(bytes);
+			return new TextDecoder('Shift_JIS').decode(bytes);
 		} catch (e) {
 			console.error(e);
 			return '';

@@ -1,8 +1,8 @@
-import { MA3Sampler } from './core/MA3Sampler';
-import { MLD } from './core/MLD';
-import { MLDPlayer } from './core/MLDPlayer';
-import { SineSampler } from './core/SineSampler';
-import { SharedRingBuffer } from './SharedRingBuffer';
+import { MA3Sampler } from '../core/MA3Sampler';
+import { MLD } from '../core/MLD';
+import { MLDPlayer } from '../core/MLDPlayer';
+import { SineSampler } from '../core/SineSampler';
+import { SharedRingBuffer } from '../SharedRingBuffer';
 
 type InitMsg = { type: 'init'; sab: SharedArrayBuffer; sampleRate: number };
 type LoadMsg = { type: 'load'; buffer: ArrayBuffer };
@@ -36,20 +36,24 @@ self.onmessage = (e: MessageEvent<Msg>) => {
 
 		player = new MLDPlayer(mld, sampler, sampleRate);
 
-		self.postMessage({
-			type: 'info',
-			title: mld.getTitle(),
-			version: mld.getVersion(),
-			date: mld.getDate(),
-			copyright: mld.getCopyright(),
-			durationLooping: mld.getDuration(false),
-			durationNoLoop: mld.getDuration(true)
-		});
+		sendMldInfo(mld);
 	} else if (msg.type === 'stop') {
 		running = false;
 		player = null;
 	}
 };
+
+function sendMldInfo(mld: MLD) {
+	self.postMessage({
+		type: 'info',
+		title: mld.getTitle(),
+		version: mld.getVersion(),
+		date: mld.getDate(),
+		copyright: mld.getCopyright(),
+		durationLooping: mld.getDuration(false),
+		durationNoLoop: mld.getDuration(true)
+	});
+}
 
 async function pump() {
 	while (running) {
