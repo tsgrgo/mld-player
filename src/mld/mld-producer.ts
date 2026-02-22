@@ -4,13 +4,14 @@ import { MLDPlayer } from './core/MLDPlayer';
 import { SineSampler } from './core/SineSampler';
 import { SharedRingBuffer } from './SharedRingBuffer';
 
-type InitMsg = { type: 'init'; sab: SharedArrayBuffer };
+type InitMsg = { type: 'init'; sab: SharedArrayBuffer; sampleRate: number };
 type LoadMsg = { type: 'load'; buffer: ArrayBuffer };
 type StopMsg = { type: 'stop' };
 type Msg = InitMsg | LoadMsg | StopMsg;
 
 let buffer: SharedRingBuffer<Float32Array> | null = null;
 let player: MLDPlayer | null = null;
+let sampleRate: number;
 
 let running = false;
 let temp: Float32Array | null = null;
@@ -21,6 +22,7 @@ self.onmessage = (e: MessageEvent<Msg>) => {
 	const msg = e.data;
 	if (msg.type === 'init') {
 		buffer = new SharedRingBuffer(msg.sab, Float32Array);
+		sampleRate = msg.sampleRate;
 		temp = new Float32Array(1024);
 		running = true;
 		void pump();
@@ -32,7 +34,7 @@ self.onmessage = (e: MessageEvent<Msg>) => {
 		const sampler = new MA3Sampler();
 		// const sampler = new SineSampler();
 
-		player = new MLDPlayer(mld, sampler, 44100); // TODO: get proper sample rate from consumer
+		player = new MLDPlayer(mld, sampler, sampleRate);
 
 		self.postMessage({
 			type: 'info',
