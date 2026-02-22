@@ -1,4 +1,5 @@
 import { playMldInWorklet } from './mld/playMldInWorklet';
+import { createMldPlayer } from './mld/createMldPlayer';
 
 function el<K extends keyof HTMLElementTagNameMap>(
 	tag: K,
@@ -36,6 +37,7 @@ function clearInfo() {
 	pDurationNoLoop.textContent = '';
 }
 
+// eslint-disable-next-line @typescript-eslint/no-misused-promises
 input.addEventListener('change', async () => {
 	clearInfo();
 
@@ -47,7 +49,9 @@ input.addEventListener('change', async () => {
 
 	status.textContent = 'Reading...';
 
-	playMldInWorklet(file);
+	// void playMldInWorklet(file);
+	const res = await createMldPlayer();
+	res.load(await file.arrayBuffer());
 
 	// try {
 	// 	const bytes = await readAsUint8Array(file);
