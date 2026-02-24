@@ -1,4 +1,5 @@
 import { createMldPlayer } from './mld/createMldPlayer';
+import { createVisualizers } from './mld/createVisualizers';
 
 function el<K extends keyof HTMLElementTagNameMap>(
 	tag: K,
@@ -50,7 +51,11 @@ input.addEventListener('change', async () => {
 
 	status.textContent = 'Reading...';
 
-	if (!mldPlayer) mldPlayer = await createMldPlayer();
+	if (!mldPlayer) {
+		mldPlayer = await createMldPlayer();
+		createVisualizers(mldPlayer.ringBuffer);
+	}
+
 	mldPlayer.load(await file.arrayBuffer());
 
 	// try {
