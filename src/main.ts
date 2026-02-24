@@ -12,10 +12,33 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 const root = document.getElementById('app') ?? document.body;
 
-const title = el('h3', { textContent: 'MLD quick viewer' });
+const title = el('h3', { textContent: 'MLD player' });
 const input = el('input');
 input.type = 'file';
 input.accept = '.mld,application/octet-stream';
+
+const demoButton = el('button', { textContent: 'Load Demo' });
+
+demoButton.addEventListener('click', async () => {
+	status.textContent = 'Reading...';
+
+	if (!mldPlayer) {
+		mldPlayer = await createMldPlayer();
+		createVisualizers(mldPlayer.ringBuffer);
+	}
+
+	const response = await fetch('/demo.mld');
+
+	if (!response.ok) {
+		throw new Error(
+			`Failed to fetch file: ${response.status} ${response.statusText}`
+		);
+	}
+
+	const buffer = await response.arrayBuffer();
+
+	mldPlayer.load(buffer);
+});
 
 const status = el('p', { textContent: 'Choose an .mld file.' });
 
@@ -99,6 +122,7 @@ input.addEventListener('change', async () => {
 root.append(
 	title,
 	input,
+	demoButton,
 	status,
 	pFile,
 	pTitle,
