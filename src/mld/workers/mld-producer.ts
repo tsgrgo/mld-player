@@ -23,7 +23,7 @@ self.onmessage = (e: MessageEvent<Msg>) => {
 	if (msg.type === 'init') {
 		buffer = new SharedRingBuffer(msg.sab, Float32Array);
 		sampleRate = msg.sampleRate;
-		temp = new Float32Array(1024);
+		temp = new Float32Array(2 ** 10);
 		running = true;
 		void pump();
 	} else if (msg.type === 'load') {
@@ -56,6 +56,8 @@ function sendMldInfo(mld: MLD) {
 	});
 }
 
+const reservedSpace = 2 ** 12;
+
 async function pump() {
 	while (running) {
 		if (!buffer || !player || !temp) {
@@ -66,7 +68,7 @@ async function pump() {
 		const freeSamples = buffer.availableWriteSize();
 		// console.log(freeSamples);
 
-		if (freeSamples >= temp.length) {
+		if (freeSamples >= temp.length + reservedSpace) {
 			const frames = temp.length / 2;
 			player.render(temp, 0, frames);
 
