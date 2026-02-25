@@ -37,7 +37,7 @@ self.onmessage = (e: MessageEvent<Msg>) => {
 
 		buffer.clear();
 		sendMldInfo(mld);
-		void pump();
+		void renderLoop();
 	} else if (msg.type === 'stop') {
 		running = false;
 		player = null;
@@ -58,31 +58,14 @@ function sendMldInfo(mld: MLD) {
 
 const reservedSpace = 2 ** 12;
 
-function pump() {
-	while (running) {
-		if (!buffer || !player || !temp) {
-			// await sleep(10);
-			continue;
-		}
-
-		// const freeSamples = buffer.availableWriteSize();
-		// console.log(freeSamples);
-
-		// if (freeSamples >= temp.length + reservedSpace) {
-		const frames = temp.length / 2;
-		player.render(temp, 0, frames);
-
-		const written = buffer.write(temp, 0, temp.length);
-		// if (written < temp.length) await sleep(1);
-
-		// 	continue;
-		// }
-
-		// Not enough space
-		// await sleep(10);
+async function renderLoop() {
+	if (!buffer || !player || !temp) {
+		throw new Error('Not initialized');
 	}
-}
 
-function sleep(ms: number) {
-	return new Promise<void>(r => setTimeout(r, ms));
+	while (running) {
+		player.render(temp, 0, temp.length / 2);
+		buffer.writeAllBlocking(temp, 0, temp.length, reservedSpace);
+		await new Promise(r => setTimeout(r, 0));
+	}
 }

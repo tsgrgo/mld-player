@@ -86,10 +86,6 @@ export class SharedRingBuffer<T extends TypedArray> {
 			throw new RangeError('write out of bounds');
 		}
 
-		while (this.availableWriteSize() < size) {
-			Atomics.wait(this.indexes, 0, Atomics.load(this.indexes, 0));
-		}
-
 		const readIndex = this.getReadIndex();
 		const writeIndex = this.getWriteIndex();
 
@@ -116,6 +112,19 @@ export class SharedRingBuffer<T extends TypedArray> {
 
 		Atomics.store(this.indexes, 1, (writeIndex + toWrite) | 0);
 		return toWrite;
+	}
+
+	writeAllBlocking(
+		src: T,
+		offset = 0,
+		size = src.length - offset,
+		reservedSpace = 0
+	) {
+		while (this.availableWriteSize() < size + reservedSpace) {
+			Atomics.wait(this.indexes, 0, Atomics.load(this.indexes, 0));
+		}
+
+		this.write(src, offset, size);
 	}
 
 	read(out: T, offset = 0, size = out.length - offset) {
