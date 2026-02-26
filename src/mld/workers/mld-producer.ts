@@ -4,16 +4,6 @@ import { MLDPlayer } from '../core/MLDPlayer';
 import { SineSampler } from '../core/SineSampler';
 import { SharedRingBuffer } from '../SharedRingBuffer';
 
-type InitMsg = {
-	type: 'init';
-	sab: SharedArrayBuffer;
-	forceCheckMessages: SharedArrayBuffer;
-	sampleRate: number;
-};
-type LoadMsg = { type: 'load'; buffer: ArrayBuffer };
-type StopMsg = { type: 'stop' };
-type Msg = InitMsg | LoadMsg | StopMsg;
-
 const RESERVED_SPACE = 2 ** 12;
 const RENDER_BATCH_SIZE = 2 ** 10;
 
@@ -26,54 +16,69 @@ let running = false;
 let temp: Float32Array;
 let renderFrames: number;
 
-self.onmessage = (e: MessageEvent<Msg>) => {
-	console.log('msg in producer', e);
-
+self.onmessage = (e: MessageEvent<ProducerMessage>) => {
 	const msg = e.data;
+	console.log('msg in producer', msg);
+
 	if (msg.type === 'init') {
-		buffer = new SharedRingBuffer(msg.sab, Float32Array);
-		forceCheckMessages = new Uint8Array(msg.forceCheckMessages);
-		sampleRate = msg.sampleRate;
-		temp = new Float32Array(RENDER_BATCH_SIZE);
-		renderFrames = temp.length / 2;
-		running = true;
-		void startRenderLoop();
+		initialize(msg);
 	} else if (msg.type === 'load') {
-		if (!buffer) return;
-		const bytes = new Uint8Array(msg.buffer);
-		const mld = new MLD(bytes);
-
-		const sampler = new MA3Sampler();
-		// const sampler = new SineSampler();
-
-		player = new MLDPlayer(mld, sampler, sampleRate);
-
-		buffer.clear();
-		sendMldInfo(mld);
+		loadMld(msg);
 	} else if (msg.type === 'stop') {
 		running = false;
+	} else if (msg.type === 'setTime') {
+		player?.setTime(msg.time * player?.getDuration(true));
+		buffer?.clear();
 	}
 };
+
+function initialize(msg: InitMsg) {
+	buffer = new SharedRingBuffer(msg.sab, Float32Array);
+	forceCheckMessages = new Uint8Array(msg.forceCheckMessages);
+	sampleRate = msg.sampleRate;
+	temp = new Float32Array(RENDER_BATCH_SIZE);
+	renderFrames = temp.length / 2;
+}
+
+function loadMld(msg: LoadMsg) {
+	if (!buffer) return;
+
+	const bytes = new Uint8Array(msg.buffer);
+	const mld = new MLD(bytes);
+
+	const sampler = new MA3Sampler();
+	// const sampler = new SineSampler();
+
+	player = new MLDPlayer(mld, sampler, sampleRate);
+	buffer.clear();
+	sendMldInfo(mld);
+
+	void startRenderLoop();
+}
 
 function sendMldInfo(mld: MLD) {
 	self.postMessage({
 		type: 'info',
-		title: mld.getTitle(),
-		version: mld.getVersion(),
-		date: mld.getDate(),
-		copyright: mld.getCopyright(),
-		durationLooping: mld.getDuration(false),
-		durationNoLoop: mld.getDuration(true)
-	});
+		info: {
+			title: mld.getTitle(),
+			version: mld.getVersion(),
+			date: mld.getDate(),
+			copyright: mld.getCopyright(),
+			durationLooping: mld.getDuration(false),
+			durationNoLoop: mld.getDuration(true)
+		}
+	} satisfies InfoMsg);
 }
 
 async function startRenderLoop() {
-	while (running) {
-		if (!buffer || !player || !temp || !renderFrames) {
-			await sleep(10);
-			continue;
-		}
+	if (running) return;
+	running = true;
 
+	if (!buffer || !player || !temp || !renderFrames) {
+		throw new Error('player not initialized');
+	}
+
+	while (running) {
 		if (buffer.availableWriteSize() >= temp.length + RESERVED_SPACE) {
 			player.render(temp, 0, renderFrames);
 			buffer.write(temp, 0, temp.length);

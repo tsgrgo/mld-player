@@ -1,8 +1,5 @@
 import { SharedRingBuffer } from '../SharedRingBuffer';
 
-type SabMsg = { type: 'sab'; sab: SharedArrayBuffer };
-type Msg = SabMsg;
-
 class MldConsumerProcessor extends AudioWorkletProcessor {
 	private buffer?: SharedRingBuffer<Float32Array>;
 	private tempBuffer?: Float32Array;
@@ -12,7 +9,7 @@ class MldConsumerProcessor extends AudioWorkletProcessor {
 		this.port.onmessage = this.handleMessage.bind(this);
 	}
 
-	handleMessage(e: MessageEvent<Msg>) {
+	handleMessage(e: MessageEvent<ConsumerMessage>) {
 		const msg = e.data;
 
 		if (msg.type === 'sab') {
