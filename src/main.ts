@@ -19,25 +19,18 @@ input.accept = '.mld,application/octet-stream';
 
 const demoButton = el('button', { textContent: 'Load Demo' });
 
-demoButton.addEventListener('click', async () => {
-	status.textContent = 'Reading...';
+const slideBar = el('input', {
+	type: 'range',
+	min: '0',
+	max: '1',
+	step: '0.01',
+	value: '0'
+});
 
-	if (!mldPlayer) {
-		mldPlayer = await createMldPlayer();
-		createVisualizers(mldPlayer.ringBuffer);
-	}
-
-	const response = await fetch('/demo.mld');
-
-	if (!response.ok) {
-		throw new Error(
-			`Failed to fetch file: ${response.status} ${response.statusText}`
-		);
-	}
-
-	const buffer = await response.arrayBuffer();
-
-	mldPlayer.load(buffer);
+slideBar.addEventListener('input', event => {
+	const val = parseFloat((event.target as HTMLInputElement).value);
+	sliderPos = val;
+	mldPlayer?.setTime(val);
 });
 
 const status = el('p', { textContent: 'Choose an .mld file.' });
@@ -62,6 +55,58 @@ function clearInfo() {
 
 let mldPlayer: Awaited<ReturnType<typeof createMldPlayer>>; // Damn this is ugly
 
+async function createPlayerIfNeeded() {
+	if (!mldPlayer) {
+		mldPlayer = await createMldPlayer();
+		createVisualizers(mldPlayer.ringBuffer);
+		mldPlayer.events.on('info', e => {
+			const info = e.detail;
+			status.textContent = 'Parsed OK.';
+			pTitle.textContent = `Title: ${info.title || '(none)'}`;
+			pVersion.textContent = `Version: ${info.version || '(none)'}`;
+			pDate.textContent = `Date: ${info.date || '(none)'}`;
+			pCopyright.textContent = `Copyright: ${info.copyright || '(none)'}`;
+			pDurationLooping.textContent = `Duration (with looping): ${info.durationLooping}`;
+			pDurationNoLoop.textContent = `Duration (without looping): ${info.durationNoLoop}`;
+			setSlideBarSpeed(info.durationNoLoop);
+		});
+	}
+}
+
+let sliderBarInterval: number;
+let sliderPos = 0;
+
+function setSlideBarSpeed(durationSeconds: number) {
+	sliderPos = 0;
+
+	const interval = 100;
+	const numOfTick = (durationSeconds * 1000) / interval;
+	const increment = 1 / numOfTick;
+
+	clearInterval(sliderBarInterval);
+	sliderBarInterval = setInterval(() => {
+		sliderPos += increment;
+		slideBar.value = `${sliderPos % 1}`;
+	}, interval);
+}
+
+demoButton.addEventListener('click', async () => {
+	status.textContent = 'Reading...';
+
+	const response = await fetch('/demo.mld');
+
+	if (!response.ok) {
+		throw new Error(
+			`Failed to fetch file: ${response.status} ${response.statusText}`
+		);
+	}
+
+	const buffer = await response.arrayBuffer();
+
+	await createPlayerIfNeeded();
+	mldPlayer.load(buffer);
+});
+
 // eslint-disable-next-line @typescript-eslint/no-misused-promises
 input.addEventListener('change', async () => {
 	clearInfo();
@@ -74,45 +119,9 @@ input.addEventListener('change', async () => {
 
 	status.textContent = 'Reading...';
 
-	if (!mldPlayer) {
-		mldPlayer = await createMldPlayer();
-		createVisualizers(mldPlayer.ringBuffer);
-	}
-
+	await createPlayerIfNeeded();
 	mldPlayer.load(await file.arrayBuffer());
 
-	// try {
-	// 	const bytes = await readAsUint8Array(file);
-
-	// 	// If your API is different, change this line accordingly.
-	// 	// e.g. const mld = MLD.parse(bytes);
-	// 	const mld = new MLD(bytes);
-
-	// 	status.textContent = 'Parsed OK.';
-
-	// 	pFile.textContent = `File: ${file.name} (${bytes.length} bytes)`;
-	// 	pTitle.textContent = `Title: ${mld.getTitle() || '(none)'}`;
-	// 	pVersion.textContent = `Version: ${mld.getVersion() || '(none)'}`;
-	// 	pDate.textContent = `Date: ${mld.getDate() || '(none)'}`;
-	// 	pCopyright.textContent = `Copyright: ${mld.getCopyright() || '(none)'}`;
-	// 	pDurationLooping.textContent = `Duration (with looping): ${mld.getDuration(
-	// 		false
-	// 	)}`;
-	// 	pDurationNoLoop.textContent = `Duration (without looping): ${mld.getDuration(
-	// 		true
-	// 	)}`;
-
-	// 	// const sampler = new SineSampler();
-	// 	// const player = new MLDPlayer(mld, sampler, 44100);
-
-	// 	playMLD(mld);
-
-	// 	// const samples = new Array<number>(1000000);
-	// 	// player.render(samples, 0, 500000);
-	// 	// // downloadAsWav(samples);
-	// 	// playPCM(samples, 44100);
-	// 	// // void playTestAudio(samples);
-	// } catch (err) {
 	// 	status.textContent = 'Failed to parse.';
 	// 	const msg = err instanceof Error ? err.message : String(err);
 	// 	pFile.textContent = `Error: ${msg}`;
@@ -123,6 +132,7 @@ root.append(
 	title,
 	input,
 	demoButton,
+	slideBar,
 	status,
 	pFile,
 	pTitle,
