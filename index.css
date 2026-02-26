@@ -94,3 +94,90 @@ button:focus-visible {
 		background-color: #f9f9f9;
 	}
 }
+
+/* Slider styles */
+input[type='range'] {
+	/* width: 100%; */
+	display: block;
+	margin: 20px auto;
+	width: 400px;
+	background-color: transparent;
+	-webkit-appearance: none;
+}
+input[type='range']:focus {
+	outline: none;
+}
+input[type='range']::-webkit-slider-runnable-track {
+	background: #2a3344;
+	border: 0;
+	width: 100%;
+	height: 25.6px;
+	cursor: pointer;
+}
+input[type='range']::-webkit-slider-thumb {
+	margin-top: -0.7px;
+	width: 18px;
+	height: 27px;
+	background: #4f7cff;
+	border: 0;
+	cursor: pointer;
+	-webkit-appearance: none;
+}
+input[type='range']:focus::-webkit-slider-runnable-track {
+	background: #2a3344;
+}
+input[type='range']::-moz-range-track {
+	background: #2a3344;
+	border: 0;
+	width: 100%;
+	height: 25.6px;
+	cursor: pointer;
+}
+input[type='range']::-moz-range-thumb {
+	width: 18px;
+	height: 27px;
+	background: #4f7cff;
+	border: 0;
+	cursor: pointer;
+}
+input[type='range']::-ms-track {
+	background: transparent;
+	border-color: transparent;
+	border-width: 0.7px 0;
+	color: transparent;
+	width: 100%;
+	height: 25.6px;
+	cursor: pointer;
+}
+input[type='range']::-ms-fill-lower {
+	background: #2a3344;
+	border: 0;
+}
+input[type='range']::-ms-fill-upper {
+	background: #2a3344;
+	border: 0;
+}
+input[type='range']::-ms-thumb {
+	width: 18px;
+	height: 27px;
+	background: #4f7cff;
+	border: 0;
+	cursor: pointer;
+	margin-top: 0px;
+	/*Needed to keep the Edge thumb centred*/
+}
+input[type='range']:focus::-ms-fill-lower {
+	background: #2a3344;
+}
+input[type='range']:focus::-ms-fill-upper {
+	background: #2a3344;
+}
+/*TODO: Use one of the selectors from https://stackoverflow.com/a/20541859/7077589 and figure out
+how to remove the virtical space around the range input in IE*/
+@supports (-ms-ime-align: auto) {
+	/* Pre-Chromium Edge only styles, selector taken from hhttps://stackoverflow.com/a/32202953/7077589 */
+	input[type='range'] {
+		margin: 0;
+		/*Edge starts the margin from the thumb, not the track as other browsers do*/
+	}
+}
