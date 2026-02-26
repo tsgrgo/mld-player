@@ -4,17 +4,27 @@ import { MLDPlayer } from '../core/MLDPlayer';
 import { SineSampler } from '../core/SineSampler';
 import { SharedRingBuffer } from '../SharedRingBuffer';
 
-type InitMsg = { type: 'init'; sab: SharedArrayBuffer; sampleRate: number };
+type InitMsg = {
+	type: 'init';
+	sab: SharedArrayBuffer;
+	forceCheckMessages: SharedArrayBuffer;
+	sampleRate: number;
+};
 type LoadMsg = { type: 'load'; buffer: ArrayBuffer };
 type StopMsg = { type: 'stop' };
 type Msg = InitMsg | LoadMsg | StopMsg;
 
-let buffer: SharedRingBuffer<Float32Array> | null = null;
-let player: MLDPlayer | null = null;
+const RESERVED_SPACE = 2 ** 12;
+const RENDER_BATCH_SIZE = 2 ** 10;
+
+let buffer: SharedRingBuffer<Float32Array>;
+let player: MLDPlayer;
 let sampleRate: number;
+let forceCheckMessages: Uint8Array;
 
 let running = false;
-let temp: Float32Array | null = null;
+let temp: Float32Array;
+let renderFrames: number;
 
 self.onmessage = (e: MessageEvent<Msg>) => {
 	console.log('msg in producer', e);
@@ -22,10 +32,12 @@ self.onmessage = (e: MessageEvent<Msg>) => {
 	const msg = e.data;
 	if (msg.type === 'init') {
 		buffer = new SharedRingBuffer(msg.sab, Float32Array);
+		forceCheckMessages = new Uint8Array(msg.forceCheckMessages);
 		sampleRate = msg.sampleRate;
-		temp = new Float32Array(2 ** 10);
+		temp = new Float32Array(RENDER_BATCH_SIZE);
+		renderFrames = temp.length / 2;
 		running = true;
-		void pump();
+		void startRenderLoop();
 	} else if (msg.type === 'load') {
 		if (!buffer) return;
 		const bytes = new Uint8Array(msg.buffer);
@@ -40,7 +52,6 @@ self.onmessage = (e: MessageEvent<Msg>) => {
 		sendMldInfo(mld);
 	} else if (msg.type === 'stop') {
 		running = false;
-		player = null;
 	}
 };
 
@@ -56,25 +67,21 @@ function sendMldInfo(mld: MLD) {
 	});
 }
 
-const reservedSpace = 2 ** 12;
-
-async function pump() {
+async function startRenderLoop() {
 	while (running) {
-		if (!buffer || !player || !temp) {
+		if (!buffer || !player || !temp || !renderFrames) {
 			await sleep(10);
 			continue;
 		}
 
-		const freeSamples = buffer.availableWriteSize();
-		// console.log(freeSamples);
+		if (buffer.availableWriteSize() >= temp.length + RESERVED_SPACE) {
+			player.render(temp, 0, renderFrames);
+			buffer.write(temp, 0, temp.length);
 
-		if (freeSamples >= temp.length + reservedSpace) {
-			const frames = temp.length / 2;
-			player.render(temp, 0, frames);
-
-			const written = buffer.write(temp, 0, temp.length);
-			if (written < temp.length) await sleep(1);
-
+			if (forceCheckMessages[0] === 1) {
+				forceCheckMessages[0] = 0;
+				await sleep(10);
+			}
 			continue;
 		}
 

@@ -3,9 +3,12 @@ import { SharedRingBuffer } from './SharedRingBuffer';
 import ProducerWorker from './workers/mld-producer?worker';
 import workletUrl from './workers/mld-consumer?worker&url';
 
+const BUFFER_SIZE = 2 ** 21;
+
 export async function createMldPlayer() {
-	const sharedBuffer = SharedRingBuffer.createBuffer(2 ** 20);
-	const ringBuffer = new SharedRingBuffer(sharedBuffer, Float32Array);
+	const sab = SharedRingBuffer.createBuffer(BUFFER_SIZE);
+	const ringBuffer = new SharedRingBuffer(sab, Float32Array);
+	const forceCheckMessages = new SharedArrayBuffer(1);
 
 	const ctx = new AudioContext({ sampleRate: 44100 });
 	await ctx.resume();
@@ -14,8 +17,9 @@ export async function createMldPlayer() {
 	const worker = new ProducerWorker();
 	worker.postMessage({
 		type: 'init',
-		sab: sharedBuffer,
-		sampleRate: ctx.sampleRate
+		sampleRate: ctx.sampleRate,
+		forceCheckMessages,
+		sab
 	});
 	worker.onmessage = (e: MessageEvent<unknown>) => {
 		console.log(e);
@@ -29,7 +33,7 @@ export async function createMldPlayer() {
 		outputChannelCount: [2]
 	});
 	node.connect(ctx.destination);
-	node.port.postMessage({ type: 'sab', sab: sharedBuffer });
+	node.port.postMessage({ type: 'sab', sab });
 
 	return {
 		ctx,
@@ -38,6 +42,10 @@ export async function createMldPlayer() {
 		ringBuffer,
 		load: (arrayBuffer: ArrayBuffer) => {
 			worker.postMessage({ type: 'load', buffer: arrayBuffer });
+			setTimeout(() => {
+				const arr = new Uint8Array(forceCheckMessages);
+				arr[0] = 1;
+			}, 10);
 		},
 		stop: async () => {
 			worker.postMessage({ type: 'stop' });
