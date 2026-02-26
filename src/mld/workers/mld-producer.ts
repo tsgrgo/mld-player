@@ -25,6 +25,7 @@ self.onmessage = (e: MessageEvent<Msg>) => {
 		sampleRate = msg.sampleRate;
 		temp = new Float32Array(2 ** 10);
 		running = true;
+		void pump();
 	} else if (msg.type === 'load') {
 		if (!buffer) return;
 		const bytes = new Uint8Array(msg.buffer);
@@ -37,7 +38,6 @@ self.onmessage = (e: MessageEvent<Msg>) => {
 
 		buffer.clear();
 		sendMldInfo(mld);
-		void pump();
 	} else if (msg.type === 'stop') {
 		running = false;
 		player = null;
@@ -58,28 +58,28 @@ function sendMldInfo(mld: MLD) {
 
 const reservedSpace = 2 ** 12;
 
-function pump() {
+async function pump() {
 	while (running) {
 		if (!buffer || !player || !temp) {
-			// await sleep(10);
+			await sleep(10);
 			continue;
 		}
 
-		// const freeSamples = buffer.availableWriteSize();
+		const freeSamples = buffer.availableWriteSize();
 		// console.log(freeSamples);
 
-		// if (freeSamples >= temp.length + reservedSpace) {
-		const frames = temp.length / 2;
-		player.render(temp, 0, frames);
+		if (freeSamples >= temp.length + reservedSpace) {
+			const frames = temp.length / 2;
+			player.render(temp, 0, frames);
 
-		const written = buffer.write(temp, 0, temp.length);
-		// if (written < temp.length) await sleep(1);
+			const written = buffer.write(temp, 0, temp.length);
+			if (written < temp.length) await sleep(1);
 
-		// 	continue;
-		// }
+			continue;
+		}
 
 		// Not enough space
-		// await sleep(10);
+		await sleep(10);
 	}
 }
 
