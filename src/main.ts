@@ -107,11 +107,6 @@ demoButton.addEventListener('click', async () => {
 	mldPlayer.load(buffer);
 });
 
-const footer = el('p', {
-	textContent:
-		'HUGE thanks to GuyPerfect for the original MLD player written in java!'
-});
-
 root.append(
 	title,
 	input,
@@ -124,8 +119,7 @@ root.append(
 	pDate,
 	pCopyright,
 	pDurationLooping,
-	pDurationNoLoop,
-	footer
+	pDurationNoLoop
 );
 
 /////////////////////////////////////////
