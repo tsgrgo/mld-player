@@ -4,7 +4,7 @@ type RingBufferStereoLike = {
 	getDataView(): Float32Array; // interleaved Float32 audio
 };
 
-export class SharedRingBufferStereoWidthMeter {
+export class StereoWidthMeter {
 	private rafId: number | null = null;
 
 	// smoothed meter value (width ratio)

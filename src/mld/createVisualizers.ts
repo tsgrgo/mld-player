@@ -4,7 +4,7 @@ import { AnalogVUMeter } from './visualizers/AnalogVUMeter';
 import { RingBufferVisualizer } from './visualizers/RingBufferVisualizer';
 import { Scope } from './visualizers/Scope';
 import { Goniometer } from './visualizers/Goniometer';
-import { SharedRingBufferStereoWidthMeter } from './visualizers/visualizer5';
+import { StereoWidthMeter } from './visualizers/StereoWidthMeter';
 
 export function createVisualizers(
 	buffer: SharedRingBuffer<Float32Array>,
@@ -67,21 +67,17 @@ export function createVisualizers(
 
 	const widthMeterCanvas =
 		document.querySelector<HTMLCanvasElement>('#width')!;
-	const widthMeter = new SharedRingBufferStereoWidthMeter(
-		widthMeterCanvas,
-		buffer,
-		{
-			channels: 2,
-			leftChannel: 0,
-			rightChannel: 1,
-			windowFrames: 1024,
-			maxWidth: 2.0,
-			attackMs: 40,
-			releaseMs: 250,
-			peakHoldMs: 700,
-			maxFps: 60
-		}
-	);
+	const widthMeter = new StereoWidthMeter(widthMeterCanvas, buffer, {
+		channels: 2,
+		leftChannel: 0,
+		rightChannel: 1,
+		windowFrames: 1024,
+		maxWidth: 2.0,
+		attackMs: 40,
+		releaseMs: 250,
+		peakHoldMs: 700,
+		maxFps: 60
+	});
 
 	widthMeter.start();
 
