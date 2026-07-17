@@ -12,7 +12,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
 
 const root = document.getElementById('app') ?? document.body;
 
-const title = el('h3', { textContent: 'MLD player' });
+const title = el('h3', { textContent: 'MLD player - MA3 Sound Chip' });
 const input = el('input');
 input.type = 'file';
 input.accept = '.mld,application/octet-stream';
