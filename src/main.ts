@@ -33,7 +33,7 @@ slideBar.addEventListener('input', event => {
 	mldPlayer?.setTime(val);
 });
 
-const status = el('p', { textContent: 'Choose an .mld file.' });
+const status = el('p', { textContent: 'Choose or drag & drop an .mld file.' });
 
 const pFile = el('p');
 const pTitle = el('p');
