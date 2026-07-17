@@ -11,7 +11,10 @@ export function createVisualizers(
 	bufferSeparate: SharedRingBuffer<Float32Array>
 ) {
 	const visualizers = document.getElementById('visualizers');
+	const chip = document.getElementById('chip');
+
 	visualizers!.style.display = 'block';
+	chip!.style.display = 'none';
 
 	const canvas = document.querySelector<HTMLCanvasElement>('#rb')!;
 	const bufferVisualizer = new RingBufferVisualizer(canvas, buffer, {
