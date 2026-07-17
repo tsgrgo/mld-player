@@ -1,6 +1,6 @@
 # MLD Player
 
-Play MLD files with an MA3 synth running in the browser.
+Play MLD files with an [MA3](https://lpcwiki.miraheze.org/wiki/Yamaha_SMAF/MA-3) synth running in the browser.
 
 An MLD file (Melody Format for i-Mode) is a legacy polyphonic ringtone format used on older Japanese NTT Docomo mobile phones.
 
