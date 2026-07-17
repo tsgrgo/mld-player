@@ -19,7 +19,7 @@ type VisualizerOptions = {
 	ceilingDb?: number; // dB mapped to 1
 };
 
-export class RingBufferAnalogVU {
+export class AnalogVUMeter {
 	private rafId: number | null = null;
 
 	private vu = 0;

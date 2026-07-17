@@ -20,7 +20,7 @@ type SharedRingBufferWaveformOpts = {
 	triggerLookbackFrames?: number; // how far back we search for trigger
 };
 
-export class SharedRingBufferWaveform {
+export class Scope {
 	private rafId: number | null = null;
 	private scratch: Float32Array = new Float32Array(0);
 

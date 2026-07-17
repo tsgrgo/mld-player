@@ -1,9 +1,9 @@
 import type { SharedRingBuffer } from './SharedRingBuffer';
 
-import { RingBufferAnalogVU } from './visualizers/RingBufferAnalogVU';
+import { AnalogVUMeter } from './visualizers/AnalogVUMeter';
 import { RingBufferVisualizer } from './visualizers/RingBufferVisualizer';
-import { SharedRingBufferWaveform } from './visualizers/visualizer3';
-import { SharedRingBufferGoniometer } from './visualizers/visualizer4';
+import { Scope } from './visualizers/Scope';
+import { Goniometer } from './visualizers/Goniometer';
 import { SharedRingBufferStereoWidthMeter } from './visualizers/visualizer5';
 
 export function createVisualizers(
@@ -22,20 +22,8 @@ export function createVisualizers(
 
 	bufferVisualizer.start();
 
-	const bufferVisualizer2 = new RingBufferVisualizer(
-		document.querySelector<HTMLCanvasElement>('#rb2')!,
-		bufferSeparate,
-		{
-			donutWidth: 3,
-			showText: false,
-			maxFps: 200
-		}
-	);
-
-	bufferVisualizer2.start();
-
 	const vu1Canvas = document.querySelector<HTMLCanvasElement>('#vu1')!;
-	const vu1 = new RingBufferAnalogVU(vu1Canvas, buffer, {
+	const vu1 = new AnalogVUMeter(vu1Canvas, buffer, {
 		channels: 2,
 		channel: 0,
 		windowFrames: 256,
@@ -49,7 +37,7 @@ export function createVisualizers(
 	vu1.start();
 
 	const vu2Canvas = document.querySelector<HTMLCanvasElement>('#vu2')!;
-	const vu2 = new RingBufferAnalogVU(vu2Canvas, buffer, {
+	const vu2 = new AnalogVUMeter(vu2Canvas, buffer, {
 		channels: 2,
 		channel: 1,
 		windowFrames: 256,
@@ -64,20 +52,16 @@ export function createVisualizers(
 
 	const canvasGoniometer =
 		document.querySelector<HTMLCanvasElement>('#goniometer')!;
-	const goniometer = new SharedRingBufferGoniometer(
-		canvasGoniometer,
-		buffer,
-		{
-			channels: 2,
-			leftChannel: 0,
-			rightChannel: 1,
-			windowFrames: 2048,
-			rotate45: false, // set true for classic “goniometer-ish” look
-			persistence: 0.9, // higher = longer trails
-			gain: 1.2,
-			maxFps: 120
-		}
-	);
+	const goniometer = new Goniometer(canvasGoniometer, buffer, {
+		channels: 2,
+		leftChannel: 0,
+		rightChannel: 1,
+		windowFrames: 2048,
+		rotate45: false, // set true for classic “goniometer-ish” look
+		persistence: 0.9, // higher = longer trails
+		gain: 1.2,
+		maxFps: 120
+	});
 
 	goniometer.start();
 
@@ -106,7 +90,7 @@ export function createVisualizers(
 			`#scope${i + 1}`
 		)!;
 
-		const scope = new SharedRingBufferWaveform(canvas3, bufferSeparate, {
+		const scope = new Scope(canvas3, bufferSeparate, {
 			channels: 16,
 			channel: i, // or 1, or "mix"
 			windowFrames: 1200, // tweak: 512/1024/2048

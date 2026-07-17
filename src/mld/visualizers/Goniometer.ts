@@ -4,7 +4,7 @@ type RingBufferStereoLike = {
 	getDataView(): Float32Array; // interleaved float32 audio
 };
 
-export class SharedRingBufferGoniometer {
+export class Goniometer {
 	private rafId: number | null = null;
 	private lastDrawAt = 0;
 
