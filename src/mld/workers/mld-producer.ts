@@ -4,7 +4,6 @@ import { MLDPlayer } from '../core/MLDPlayer';
 import { SineSampler } from '../core/SineSampler';
 import { SharedRingBuffer } from '../SharedRingBuffer';
 
-const RESERVED_SPACE = 2 ** 12;
 const RENDER_BATCH_SIZE = 2 ** 10;
 
 let buffer: SharedRingBuffer<Float32Array>;
@@ -18,6 +17,7 @@ let running = false;
 let temp: Float32Array;
 let tempSeparate: Float32Array;
 let renderFrames: number;
+let reservedSpace = 0;
 
 self.onmessage = (e: MessageEvent<ProducerMessage>) => {
 	const msg = e.data;
@@ -39,6 +39,7 @@ function initialize(msg: InitMsg) {
 	buffer = new SharedRingBuffer(msg.sab, Float32Array);
 	separateBuffer = new SharedRingBuffer(msg.sabSeparate, Float32Array);
 	forceCheckMessages = new Uint8Array(msg.forceCheckMessages);
+	reservedSpace = buffer.getCapacity() * 0.02;
 	sampleRate = msg.sampleRate;
 	temp = new Float32Array(RENDER_BATCH_SIZE);
 	tempSeparate = new Float32Array((RENDER_BATCH_SIZE / 2) * 16);
@@ -93,7 +94,7 @@ async function startRenderLoop() {
 	}
 
 	while (running) {
-		if (buffer.availableWriteSize() >= temp.length + RESERVED_SPACE) {
+		if (buffer.availableWriteSize() >= temp.length + reservedSpace) {
 			player.render(
 				temp,
 				0,
