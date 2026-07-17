@@ -226,10 +226,23 @@ export class AnalogVUMeter {
 		ctx.lineTo(nx, ny);
 		ctx.stroke();
 
+		// Text
 		// ctx.fillStyle = '#e7edf8';
 		// ctx.font = '12px system-ui, -apple-system, Segoe UI, Roboto, Arial';
 		// ctx.textAlign = 'center';
 		// ctx.fillText(`${isFinite(db) ? db.toFixed(1) : '-∞'} dB`, cx, h * 0.13);
+
+		// ctx.font = '11px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+		// ctx.textAlign = 'left';
+		// ctx.textBaseline = 'top';
+		// ctx.fillText(`VU Meter`, 8, 8);
+
+		// VU logo
+		// ctx.fillStyle = '#3b465c';
+		// ctx.font =
+		// 	'bold 15px system-ui, -apple-system, Segoe UI, Roboto, Arial';
+		// ctx.textAlign = 'center';
+		// ctx.fillText('VU', w / 2, h / 1.5);
 	}
 
 	private drawTick(
