@@ -335,6 +335,7 @@ class Instance implements SamplerInstance {
 	channels: Channel[]; // Channel states
 	sampleRate = 0; // Output sampling rate
 	smpNext: number[]; // Next input sample
+	smpSeparate: number[]; // Next input sample
 	smpPosition = 0; // Position between input samples
 	smpPrev: number[]; // Previous input sample
 	smpWidth = 0; // Number of input samples per output sample
@@ -360,6 +361,7 @@ class Instance implements SamplerInstance {
 		this.fm4ops = new Map<number, Algorithm>();
 		this.sampleRate = sampleRate;
 		this.smpNext = new Array<number>(2);
+		this.smpSeparate = new Array<number>(16);
 		this.smpPrev = new Array<number>(2);
 		this.smpWidth = SAMPLE_RATE / sampleRate;
 		this.volRate = 1 / (sampleRate * 0.01);
@@ -535,7 +537,8 @@ class Instance implements SamplerInstance {
 		left = 1,
 		right = 1,
 		erase = true,
-		clamp = true
+		clamp = true,
+		separateChannels?: Float32Array
 	): void {
 		// Error checking
 		if (samples == null) throw new Error('A sample buffer is required.');
@@ -547,6 +550,8 @@ class Instance implements SamplerInstance {
 			throw new Error('Invalid left amplitude.');
 		if (!Number.isFinite(right) || right < 0.0)
 			throw new Error('Invalid right amplitude.');
+
+		let separatePos = 0;
 
 		// Process all output frames
 		const frame = new Float32Array(2);
@@ -633,6 +638,12 @@ class Instance implements SamplerInstance {
 			// Output the frame
 			samples[offset++] = frame[0];
 			samples[offset++] = frame[1];
+
+			if (separateChannels) {
+				for (let i = 0; i < this.channels.length; i++) {
+					separateChannels[separatePos++] = this.smpSeparate[i];
+				}
+			}
 
 			// Advance to the next output sample
 			this.smpPosition = r;
@@ -791,6 +802,11 @@ class Instance implements SamplerInstance {
 	// Produce one input sample
 	private sample(): void {
 		this.smpNext[0] = this.smpNext[1] = 0.0;
+
+		for (let i = 0; i < this.smpSeparate.length; i++) {
+			this.smpSeparate[i] = 0.0;
+		}
+
 		for (const chan of this.channels) chan.render();
 		this.amPhase = (this.amPhase + 1) % 0x34000;
 		this.vibPhase++;
@@ -1022,8 +1038,14 @@ class Note {
 		const sample = !this.algorithm.isWave
 			? this.sampleFM()
 			: this.operators[0].sample(0, false) / 32768.0;
+
 		this.instance.smpNext[0] += sample * this.ampLeft;
 		this.instance.smpNext[1] += sample * this.ampRight;
+
+		// Also render channels separately for visualization
+		const chanId = this.channel.index;
+		this.instance.smpSeparate[chanId] +=
+			sample * (this.ampLeft + this.ampRight);
 
 		// Adjust stereo levels
 		this.ampLeft = this.ease(this.ampLeft, tgtLeft);

@@ -4,7 +4,7 @@ import ProducerWorker from './workers/mld-producer?worker';
 import workletUrl from './workers/mld-consumer?worker&url';
 import type { MldInfo } from './types/MldInfo';
 
-const BUFFER_SIZE = 2 ** 21;
+const BUFFER_SIZE = 2 ** 20;
 
 type EventMap = {
 	info: MldInfo;
@@ -14,20 +14,30 @@ export async function createMldPlayer() {
 	const sab = SharedRingBuffer.createBuffer(BUFFER_SIZE);
 	const ringBuffer = new SharedRingBuffer(sab, Float32Array);
 
+	const sabSeparate = SharedRingBuffer.createBuffer((BUFFER_SIZE / 2) * 16);
+	const separateChannels = new SharedRingBuffer(sabSeparate, Float32Array);
+
 	const ctx = new AudioContext({ sampleRate: 44100 });
 	await ctx.resume();
 
 	// Start producer
-	const { sendProducerMessage, events } = createProducer(sab, ctx.sampleRate);
+	const { sendProducerMessage, events } = createProducer(
+		sab,
+		sabSeparate,
+		ctx.sampleRate
+	);
 
 	// Start consumer
-	const node = await createConsumer(sab, ctx);
+	const node = await createConsumer(sab, sabSeparate, ctx);
+
+	console.log('player created');
 
 	return {
 		ctx,
 		node,
 		events,
 		ringBuffer,
+		separateChannels,
 		load: (arrayBuffer: ArrayBuffer) => {
 			sendProducerMessage({ type: 'load', buffer: arrayBuffer });
 		},
@@ -43,7 +53,11 @@ export async function createMldPlayer() {
 	};
 }
 
-function createProducer(sab: SharedArrayBuffer, sampleRate: number) {
+function createProducer(
+	sab: SharedArrayBuffer,
+	sabSeparate: SharedArrayBuffer,
+	sampleRate: number
+) {
 	const forceCheckMessages = new SharedArrayBuffer(1);
 	const forceCheckMessagesView = new Uint8Array(forceCheckMessages);
 
@@ -55,6 +69,7 @@ function createProducer(sab: SharedArrayBuffer, sampleRate: number) {
 		type: 'init',
 		sampleRate: sampleRate,
 		forceCheckMessages,
+		sabSeparate,
 		sab
 	} satisfies ProducerMessage);
 
@@ -76,7 +91,11 @@ function createProducer(sab: SharedArrayBuffer, sampleRate: number) {
 	return { sendProducerMessage, events };
 }
 
-async function createConsumer(sab: SharedArrayBuffer, ctx: AudioContext) {
+async function createConsumer(
+	sab: SharedArrayBuffer,
+	sabSeparate: SharedArrayBuffer,
+	ctx: AudioContext
+) {
 	await ctx.audioWorklet.addModule(workletUrl);
 	const node = new AudioWorkletNode(ctx, 'mld-consumer', {
 		numberOfInputs: 0,
@@ -84,7 +103,13 @@ async function createConsumer(sab: SharedArrayBuffer, ctx: AudioContext) {
 		outputChannelCount: [2]
 	});
 	node.connect(ctx.destination);
-	node.port.postMessage({ type: 'sab', sab } satisfies ConsumerMessage);
+	node.port.postMessage({
+		type: 'sab',
+		sab,
+		sabSeparate
+	} satisfies ConsumerMessage);
+
+	return node;
 }
 
 export function createEvents<Events extends Record<string, any>>() {

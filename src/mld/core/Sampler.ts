@@ -231,7 +231,8 @@ export interface SamplerInstance {
 		left: number,
 		right: number,
 		erase: boolean,
-		clamp: boolean
+		clamp: boolean,
+		separateChannels?: Float32Array
 	): void;
 
 	/**

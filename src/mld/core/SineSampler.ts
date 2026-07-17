@@ -204,7 +204,8 @@ class Instance implements SamplerInstance {
 		left = 1,
 		right = 1,
 		erase = true,
-		clamp = true
+		clamp = true,
+		separateChannels?: Float32Array
 	): void {
 		// Error checking
 		if (samples == null) throw new Error('A sample buffer is required.');
@@ -220,11 +221,24 @@ class Instance implements SamplerInstance {
 		// Erase the output buffer
 		if (erase) {
 			for (let x = frames * 2 - 1; x >= 0; x--) samples[offset + x] = 0;
+
+			if (separateChannels) {
+				for (let x = frames * 16 - 1; x >= 0; x--)
+					separateChannels[offset + x] = 0;
+			}
 		}
 
 		// Render output samples
 		for (const chan of this.channels)
-			this.chanRender(chan, samples, offset, frames, left, right);
+			this.chanRender(
+				chan,
+				samples,
+				offset,
+				frames,
+				left,
+				right,
+				separateChannels
+			);
 
 		// Clamp the output buffer
 		if (clamp) {
@@ -300,7 +314,8 @@ class Instance implements SamplerInstance {
 		offset: number,
 		frames: number,
 		left: number,
-		right: number
+		right: number,
+		separateChannels?: Float32Array
 	): void {
 		// Working variables
 		const bend = this.masterTune * chan.bendOut;
@@ -317,7 +332,8 @@ class Instance implements SamplerInstance {
 					frames,
 					chan.volLeft * left,
 					chan.volRight * right,
-					bend
+					bend,
+					separateChannels
 				)
 			)
 				chan.notesOut.splice(x--, 1);
@@ -347,7 +363,8 @@ class Instance implements SamplerInstance {
 		frames: number,
 		left: number,
 		right: number,
-		bend: number
+		bend: number,
+		separateChannels?: Float32Array
 	): boolean {
 		// Working variables
 		const freq = note.freqBase * bend;
@@ -357,12 +374,21 @@ class Instance implements SamplerInstance {
 		note.volLeftTarget = note.volBase * left;
 		note.volRightTarget = note.volBase * right;
 
+		const chanId = note.channel?.index || 0;
+		let separateOffset = chanId;
+
 		// Process all samples
 		for (let x = 0; x < frames; x++) {
 			// Generate one sample
 			const sample = this.sample(note, advance);
 			samples[offset++] += sample * note.volLeftLevel;
 			samples[offset++] += sample * note.volRightLevel;
+
+			if (separateChannels) {
+				const mono = sample * (note.volLeftLevel + note.volRightLevel);
+				separateChannels[separateOffset] += mono;
+				separateOffset += this.channels.length;
+			}
 
 			// Adjust stereo levels
 			note.volLeftLevel = this.ease(

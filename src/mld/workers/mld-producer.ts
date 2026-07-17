@@ -8,12 +8,15 @@ const RESERVED_SPACE = 2 ** 12;
 const RENDER_BATCH_SIZE = 2 ** 10;
 
 let buffer: SharedRingBuffer<Float32Array>;
+let separateBuffer: SharedRingBuffer<Float32Array>;
+
 let player: MLDPlayer;
 let sampleRate: number;
 let forceCheckMessages: Uint8Array;
 
 let running = false;
 let temp: Float32Array;
+let tempSeparate: Float32Array;
 let renderFrames: number;
 
 self.onmessage = (e: MessageEvent<ProducerMessage>) => {
@@ -28,15 +31,17 @@ self.onmessage = (e: MessageEvent<ProducerMessage>) => {
 		running = false;
 	} else if (msg.type === 'setTime') {
 		player?.setTime(msg.time * player?.getDuration(true));
-		buffer?.clear();
+		clearBuffers();
 	}
 };
 
 function initialize(msg: InitMsg) {
 	buffer = new SharedRingBuffer(msg.sab, Float32Array);
+	separateBuffer = new SharedRingBuffer(msg.sabSeparate, Float32Array);
 	forceCheckMessages = new Uint8Array(msg.forceCheckMessages);
 	sampleRate = msg.sampleRate;
 	temp = new Float32Array(RENDER_BATCH_SIZE);
+	tempSeparate = new Float32Array((RENDER_BATCH_SIZE / 2) * 16);
 	renderFrames = temp.length / 2;
 }
 
@@ -46,14 +51,23 @@ function loadMld(msg: LoadMsg) {
 	const bytes = new Uint8Array(msg.buffer);
 	const mld = new MLD(bytes);
 
-	const sampler = new MA3Sampler();
+	const instrumentType = 0;
+	const drumType = 0;
+	const waveDrumType = 0;
+
+	const sampler = new MA3Sampler(instrumentType, drumType, waveDrumType);
 	// const sampler = new SineSampler();
 
 	player = new MLDPlayer(mld, sampler, sampleRate);
-	buffer.clear();
+	clearBuffers();
 	sendMldInfo(mld);
 
 	void startRenderLoop();
+}
+
+function clearBuffers() {
+	buffer.clear();
+	separateBuffer.clear();
 }
 
 function sendMldInfo(mld: MLD) {
@@ -80,8 +94,19 @@ async function startRenderLoop() {
 
 	while (running) {
 		if (buffer.availableWriteSize() >= temp.length + RESERVED_SPACE) {
-			player.render(temp, 0, renderFrames);
+			player.render(
+				temp,
+				0,
+				renderFrames,
+				1,
+				1,
+				true,
+				true,
+				tempSeparate
+			);
 			buffer.write(temp, 0, temp.length);
+
+			separateBuffer.write(tempSeparate, 0, tempSeparate.length);
 
 			if (forceCheckMessages[0] === 1) {
 				forceCheckMessages[0] = 0;

@@ -552,7 +552,8 @@ export class MLD {
 
 		// Error checking
 		if (this.contentType != 0x0101) {
-			throw new Error('Unsupported content type: ' + this.contentType);
+			//throw new Error('Unsupported content type: ' + this.contentType);
+			console.error('Unsupported content type: ' + this.contentType);
 		}
 
 		// Number of tracks

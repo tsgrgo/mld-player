@@ -3,6 +3,7 @@ type ProducerMessage = InitMsg | LoadMsg | StopMsg | GetTimeMsg | SetTimeMsg;
 type InitMsg = {
 	type: 'init';
 	sab: SharedArrayBuffer;
+	sabSeparate: SharedArrayBuffer;
 	forceCheckMessages: SharedArrayBuffer;
 	sampleRate: number;
 };
@@ -21,4 +22,8 @@ type InfoMsg = { type: 'info'; info: MldInfo };
 
 type ConsumerMessage = SabMsg;
 
-type SabMsg = { type: 'sab'; sab: SharedArrayBuffer };
+type SabMsg = {
+	type: 'sab';
+	sab: SharedArrayBuffer;
+	sabSeparate: SharedArrayBuffer;
+};

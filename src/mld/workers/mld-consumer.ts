@@ -4,6 +4,9 @@ class MldConsumerProcessor extends AudioWorkletProcessor {
 	private buffer?: SharedRingBuffer<Float32Array>;
 	private tempBuffer?: Float32Array;
 
+	private bufferSeparate?: SharedRingBuffer<Float32Array>;
+	private tempBufferSeparate?: Float32Array;
+
 	constructor() {
 		super();
 		this.port.onmessage = this.handleMessage.bind(this);
@@ -14,6 +17,10 @@ class MldConsumerProcessor extends AudioWorkletProcessor {
 
 		if (msg.type === 'sab') {
 			this.buffer = new SharedRingBuffer(msg.sab, Float32Array);
+			this.bufferSeparate = new SharedRingBuffer(
+				msg.sabSeparate,
+				Float32Array
+			);
 		}
 	}
 
@@ -33,7 +40,15 @@ class MldConsumerProcessor extends AudioWorkletProcessor {
 			this.tempBuffer = new Float32Array(frames * 2);
 		}
 
+		if (
+			!this.tempBufferSeparate ||
+			this.tempBufferSeparate.length !== frames * 16
+		) {
+			this.tempBufferSeparate = new Float32Array(frames * 16);
+		}
+
 		this.buffer.read(this.tempBuffer);
+		this.bufferSeparate!.read(this.tempBufferSeparate);
 
 		let writeIndex = 0;
 		for (let i = 0; i < this.tempBuffer.length; i += 2) {

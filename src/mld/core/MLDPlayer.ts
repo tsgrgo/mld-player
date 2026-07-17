@@ -342,7 +342,8 @@ export class MLDPlayer {
 		left = 1,
 		right = 1,
 		erase = true,
-		clamp = true
+		clamp = true,
+		separateChannels?: Float32Array
 	): number {
 		let ret = 0; // Total frames output so far
 
@@ -380,7 +381,8 @@ export class MLDPlayer {
 						left,
 						right,
 						erase,
-						clamp
+						clamp,
+						separateChannels
 					);
 
 				// State management

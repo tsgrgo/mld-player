@@ -58,7 +58,7 @@ let mldPlayer: Awaited<ReturnType<typeof createMldPlayer>>; // Damn this is ugly
 async function createPlayerIfNeeded() {
 	if (!mldPlayer) {
 		mldPlayer = await createMldPlayer();
-		createVisualizers(mldPlayer.ringBuffer);
+		createVisualizers(mldPlayer.ringBuffer, mldPlayer.separateChannels);
 		mldPlayer.events.on('info', e => {
 			const info = e.detail;
 			status.textContent = 'Parsed OK.';
@@ -107,27 +107,6 @@ demoButton.addEventListener('click', async () => {
 	mldPlayer.load(buffer);
 });
 
-// eslint-disable-next-line @typescript-eslint/no-misused-promises
-input.addEventListener('change', async () => {
-	clearInfo();
-
-	const file = input.files?.[0];
-	if (!file) {
-		status.textContent = 'No file selected.';
-		return;
-	}
-
-	status.textContent = 'Reading...';
-
-	await createPlayerIfNeeded();
-	mldPlayer.load(await file.arrayBuffer());
-
-	// 	status.textContent = 'Failed to parse.';
-	// 	const msg = err instanceof Error ? err.message : String(err);
-	// 	pFile.textContent = `Error: ${msg}`;
-	// }
-});
-
 root.append(
 	title,
 	input,
@@ -142,3 +121,84 @@ root.append(
 	pDurationLooping,
 	pDurationNoLoop
 );
+
+/////////////////////////////////////////
+
+async function handleFiles(files: FileList | File[]) {
+	const file = Array.from(files)[0];
+	if (!file) return;
+
+	if (!file) {
+		status.textContent = 'No file selected.';
+		return;
+	}
+
+	status.textContent = 'Reading...';
+
+	await createPlayerIfNeeded();
+	mldPlayer.load(await file.arrayBuffer());
+
+	// 	status.textContent = 'Failed to parse.';
+	// 	const msg = err instanceof Error ? err.message : String(err);
+	// 	pFile.textContent = `Error: ${msg}`;
+	// }
+}
+
+input.addEventListener('change', () => {
+	if (input.files) handleFiles(input.files);
+	input.value = '';
+});
+
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+	(window.addEventListener(evt, (e: Event) => {
+		e.preventDefault();
+		e.stopPropagation();
+	}),
+		{ passive: false });
+});
+
+// Optional overlay for UX
+const overlay = el('div');
+overlay.style.cssText = `
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.35);
+  color: white;
+  font: 600 18px system-ui, sans-serif;
+  z-index: 999999;
+  pointer-events: none;
+`;
+overlay.textContent = 'Drop .mld file to load';
+document.body.appendChild(overlay);
+
+let dragDepth = 0;
+
+window.addEventListener('dragenter', e => {
+	// Only show overlay if a file is being dragged
+	const dt = (e as DragEvent).dataTransfer;
+	if (!dt?.types?.includes('Files')) return;
+
+	dragDepth++;
+	overlay.style.display = 'flex';
+});
+
+window.addEventListener('dragleave', e => {
+	const dt = (e as DragEvent).dataTransfer;
+	if (dt && !dt.types.includes('Files')) return;
+
+	dragDepth = Math.max(0, dragDepth - 1);
+	if (dragDepth === 0) overlay.style.display = 'none';
+});
+
+window.addEventListener('drop', e => {
+	overlay.style.display = 'none';
+	dragDepth = 0;
+
+	const dt = (e as DragEvent).dataTransfer;
+	if (!dt?.files?.length) return;
+
+	handleFiles(dt.files);
+});
