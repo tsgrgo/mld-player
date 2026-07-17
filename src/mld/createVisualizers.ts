@@ -10,6 +10,9 @@ export function createVisualizers(
 	buffer: SharedRingBuffer<Float32Array>,
 	bufferSeparate: SharedRingBuffer<Float32Array>
 ) {
+	const visualizers = document.getElementById('visualizers');
+	visualizers!.style.display = 'block';
+
 	const canvas = document.querySelector<HTMLCanvasElement>('#rb')!;
 	const bufferVisualizer = new RingBufferVisualizer(canvas, buffer, {
 		donutWidth: 3,
